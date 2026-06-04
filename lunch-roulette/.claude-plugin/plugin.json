@@ -1,0 +1,18 @@
+{
+  "name": "lunch-roulette",
+  "version": "0.2.0",
+  "description": "Daily lunch roulette for remote teams: collects who's free over Slack, pairs people into twos (or a three when odd), rotates pairings day to day, and sends Google Calendar invites. A trusted orchestrator skill does the matching and calendar/Drive writes; a cheap, tool-locked lunch-messenger subagent handles all Slack conversation with coworkers.",
+  "author": {
+    "name": "Lunch Roulette"
+  },
+  "keywords": [
+    "lunch",
+    "lunch roulette",
+    "lunch buddies",
+    "pairing",
+    "team",
+    "slack",
+    "google calendar",
+    "scheduling"
+  ]
+}

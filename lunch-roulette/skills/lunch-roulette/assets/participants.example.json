@@ -1,0 +1,22 @@
+{
+  "participants": [
+    {
+      "name": "Alice Rivera",
+      "email": "alice@org.com",
+      "slack_id": "U01ALICE",
+      "slack_username": "alice",
+      "timezone": "America/New_York",
+      "active": true,
+      "joined": "2026-06-01"
+    },
+    {
+      "name": "Bob Chen",
+      "email": "bob@org.com",
+      "slack_id": "U02BOBCH",
+      "slack_username": "bob",
+      "timezone": "America/Los_Angeles",
+      "active": true,
+      "joined": "2026-06-01"
+    }
+  ]
+}

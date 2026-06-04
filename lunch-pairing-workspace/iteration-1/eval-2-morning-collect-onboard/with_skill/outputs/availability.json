@@ -1,0 +1,37 @@
+{
+  "date": "2026-06-03",
+  "responses": [
+    {
+      "email": "alice@org.com",
+      "wants_lunch": true,
+      "free": [["12:00", "13:00"]],
+      "raw": "in, 12-1",
+      "responded_at": "2026-06-03T09:20:00-04:00"
+    },
+    {
+      "email": "bob@org.com",
+      "wants_lunch": false,
+      "free": null,
+      "raw": "out today, got a dentist appt",
+      "responded_at": "2026-06-03T09:25:00-04:00"
+    },
+    {
+      "email": "carol@org.com",
+      "wants_lunch": true,
+      "free": null,
+      "raw": "yes! flexible whenever",
+      "responded_at": "2026-06-03T09:31:00-04:00"
+    }
+  ],
+  "nudged": ["dave@org.com", "erin@org.com", "frank@org.com"],
+  "no_response": ["dave@org.com", "erin@org.com", "frank@org.com"],
+  "pending_onboarding": [
+    {
+      "slack_username": "nina",
+      "raw": "hey is this the lunch buddies thing? can I join?",
+      "received_at": "2026-06-03T09:50:00-04:00",
+      "status": "awaiting_email",
+      "note": "Not on roster. Onboarding reply drafted (asking for work email). Not added to participants.json yet and not counted in pairing pool until email + availability provided."
+    }
+  ]
+}

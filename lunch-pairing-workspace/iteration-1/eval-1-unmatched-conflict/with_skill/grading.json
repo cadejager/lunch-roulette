@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Ivan is reported as unmatched, with a reason about his availability not overlapping others",
+      "passed": true,
+      "evidence": "groups.json unmatched: Ivan, reason \"no compatible group with overlapping free time\"; drafts.md explains his 12:00-13:00 window doesn't line up a full hour with either pair."
+    },
+    {
+      "text": "The other four people (Alice, Bob, Carol, Dave) are matched into two pairs",
+      "passed": true,
+      "evidence": "Carol+Dave @13:00-14:00 and Alice+Bob @11:30-12:30."
+    },
+    {
+      "text": "Ivan is not forced into any group",
+      "passed": true,
+      "evidence": "Ivan appears only under \"unmatched\"; no group contains him."
+    },
+    {
+      "text": "A friendly message to Ivan is drafted, ideally suggesting he give a wider time window",
+      "passed": true,
+      "evidence": "drafts.md DM to Ivan: warm tone, apologizes, and asks for \"a wider window tomorrow \u2014 even 30 extra minutes on either side\"."
+    },
+    {
+      "text": "No calendar event is actually created and no message is actually sent (dry run respected)",
+      "passed": true,
+      "evidence": "Header: \"DRY RUN \u2014 nothing sent\"; \"no calendar events were created\". Invites/DMs only drafted."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

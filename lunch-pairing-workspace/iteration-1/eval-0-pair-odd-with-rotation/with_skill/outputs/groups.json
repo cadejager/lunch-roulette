@@ -1,0 +1,75 @@
+{
+  "date": "2026-06-03",
+  "groups": [
+    {
+      "members": [
+        {
+          "email": "erin@org.com",
+          "name": "Erin",
+          "slack_id": "U5",
+          "slack_username": "erin"
+        },
+        {
+          "email": "alice@org.com",
+          "name": "Alice",
+          "slack_id": "U1",
+          "slack_username": "alice"
+        },
+        {
+          "email": "dave@org.com",
+          "name": "Dave",
+          "slack_id": "U4",
+          "slack_username": "dave"
+        }
+      ],
+      "suggested_slot": {
+        "start": "12:00",
+        "end": "13:00"
+      },
+      "repeat_penalty": 0.0
+    },
+    {
+      "members": [
+        {
+          "email": "carol@org.com",
+          "name": "Carol",
+          "slack_id": "U3",
+          "slack_username": "carol"
+        },
+        {
+          "email": "grace@org.com",
+          "name": "Grace",
+          "slack_id": "U7",
+          "slack_username": "grace"
+        }
+      ],
+      "suggested_slot": {
+        "start": "12:30",
+        "end": "13:30"
+      },
+      "repeat_penalty": 0.0
+    },
+    {
+      "members": [
+        {
+          "email": "frank@org.com",
+          "name": "Frank",
+          "slack_id": "U6",
+          "slack_username": "frank"
+        },
+        {
+          "email": "bob@org.com",
+          "name": "Bob",
+          "slack_id": "U2",
+          "slack_username": "bob"
+        }
+      ],
+      "suggested_slot": {
+        "start": "11:45",
+        "end": "12:45"
+      },
+      "repeat_penalty": 0.0
+    }
+  ],
+  "unmatched": []
+}

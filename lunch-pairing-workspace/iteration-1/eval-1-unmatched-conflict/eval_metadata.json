@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "unmatched-conflict",
+  "prompt": "Can you put together today's lunch pairs? The morning replies are in messages.txt, roster in participants.json, past pairings in history.json (in the inputs folder). If anyone can't be matched, tell me who and why, and draft a friendly note to them. Dry run — don't send invites or messages, just draft them.",
+  "assertions": [
+    "Ivan is reported as unmatched, with a reason about his availability not overlapping others",
+    "The other four people (Alice, Bob, Carol, Dave) are matched into two pairs",
+    "Ivan is not forced into any group",
+    "A friendly message to Ivan is drafted, ideally suggesting he give a wider time window",
+    "No calendar event is actually created and no message is actually sent (dry run respected)"
+  ]
+}

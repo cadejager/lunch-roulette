@@ -119,10 +119,24 @@ up. You never touch Slack directly — the messenger does.
    work out which timezone their times were given in — the `stated_tz` the
    messenger reported if they named one, else that person's `timezone` from the
    roster, else the reference zone — and **convert their windows into the reference
-   timezone**, recording the source zone in `tz`. Then clip open-ended windows to
-   the lunch window and **upload to Drive** as `availability-<DATE>.json`. If
-   someone's zone is unknown and their time is ambiguous, don't guess: compose a
-   one-line clarifying ask (the messenger sends it) and fold them in next pass.
+   timezone**, recording the source zone in `tz`. How you bound each person then
+   depends on `config.lunch_window_is_local`:
+   - **Local mode (`true`, the default for new teams).** Each person lunches inside
+     the `lunch_window` band *in their own home zone*. Convert that band into the
+     reference zone for this person, clip their stated free times to it, and — this
+     is the important part — **materialize flexible ("any time") people as that
+     explicit band rather than leaving `free` null.** In local mode the matcher
+     reads a null as "free all day," which would wrongly pair people across
+     incompatible zones; an explicit per-person band is what makes someone on
+     Pacific only overlap others whose lunch actually reaches the same hours. Two
+     people on opposite coasts may never align, and that's expected.
+   - **Reference-zone mode (`false`/absent).** There's one shared `lunch_window` in
+     the reference zone. Clip each person's windows to it; you can leave a flexible
+     person's `free` null and the matcher will expand it to the whole window.
+
+   Then **upload to Drive** as `availability-<DATE>.json`. If someone's zone is
+   unknown and their time is ambiguous, don't guess: compose a one-line clarifying
+   ask (the messenger sends it) and fold them in next pass.
 4. **Onboard unknown senders** — for each person in `unknown_senders`, run the
    Onboarding flow below (compose the ask; the messenger sends it).
 5. **Decide who to nudge** — active roster members with no response today. Compose
@@ -227,9 +241,17 @@ Confirm each side-effect before doing it — you're creating real shared resourc
    zone the lunch window and invites live on), the **organizer email**, and the
    lunch window if they want something other than the default. Seed `config.json`
    from `assets/config.example.json` with these.
-5. **Add the initial roster.** Add participants to `participants.json` — each with
-   a name, email, Slack handle, and **home timezone** — or let onboarding grow it
-   organically. Upload `participants.json` and an empty `history.json` to Drive.
+5. **Add the initial roster — or cold-start it.** You can hand-enter participants
+   in `participants.json` (each with a name, email, Slack handle, and **home
+   timezone**), but you don't have to. The lighter path for a brand-new team is to
+   start with an empty roster and let people sign themselves up: with the host's
+   go-ahead, have the `lunch-messenger` post a one-time kickoff message in the
+   intake channel inviting anyone who wants in to say so. The next COLLECT run treats
+   every replier as an unknown sender and runs them through Onboarding (asking only
+   for work email + home timezone), so the roster fills itself from real opt-ins —
+   and daily collection keeps onboarding newcomers after that, so it stays current
+   without anyone maintaining it by hand. Either way, upload `participants.json`
+   (even if empty) and an empty `history.json` to Drive.
 
 Then do the first real run as a dry-run (see Guardrails) so the host can eyeball
 the groups and messages before anything reaches the team.

@@ -147,6 +147,45 @@ def test_deterministic_same_day():
     assert r1 == r2, (r1, r2)
 
 
+@case
+def test_local_window_respected():
+    # Local mode: the orchestrator has already converted each person's local
+    # lunch band into the reference zone and clipped their free time to it, so a
+    # band *outside* the default 11:30-14:00 window must survive untouched —
+    # this is how a whole team that lunches at, say, 15:00 their own time still
+    # gets matched. The matcher must not re-clip to the global window here.
+    res = pair.compute(
+        avail("2026-06-03", [
+            ("a@x", [["15:00", "16:00"]]),
+            ("b@x", [["15:00", "16:00"]]),
+        ]),
+        {"rounds": []}, {"lunch_window_is_local": True}, {},
+    )
+    gs = groups_as_sets(res)
+    assert gs == [frozenset({"a@x", "b@x"})], gs
+    assert not res["unmatched"], res["unmatched"]
+    assert res["groups"][0]["suggested_slot"] == {"start": "15:00", "end": "16:00"}
+
+
+@case
+def test_default_mode_clips_to_global_window():
+    # Same out-of-window band, but WITHOUT the local flag: the default
+    # reference-zone behavior clips to the one global lunch window. Everything
+    # they stated falls outside it, so they fall back to flexible and meet
+    # inside 11:30-14:00 — proving the flag is what changes the semantics.
+    res = pair.compute(
+        avail("2026-06-03", [
+            ("a@x", [["15:00", "16:00"]]),
+            ("b@x", [["15:00", "16:00"]]),
+        ]),
+        {"rounds": []}, {}, {},
+    )
+    gs = groups_as_sets(res)
+    assert gs == [frozenset({"a@x", "b@x"})], gs
+    slot = res["groups"][0]["suggested_slot"]
+    assert slot["start"] == "11:30" and slot["end"] == "12:30", slot
+
+
 def main():
     failed = 0
     for fn in CASES:

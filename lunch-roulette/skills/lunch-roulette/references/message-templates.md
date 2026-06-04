@@ -34,6 +34,16 @@ After they reply:
 > You're in, {first_name}! Want lunch today? If so, when are you free
 > (e.g. "12–1")? If you're ever in a different timezone, just say so in the message.
 
+## Kickoff sign-up (first-time setup → intake channel)
+
+A one-time broadcast when a brand-new team cold-starts with an empty roster (see
+SKILL.md → First-time setup). Post it once, and only after the host says go, to
+invite people to opt in; the next COLLECT run onboards everyone who replies.
+
+> 👋 **Lunch roulette is starting!** Each day I'll pair a few of us up for a relaxed
+> lunch so we get to know people across the team. Want in? Just reply here and I'll
+> get you set up — it takes one message, and you can opt out anytime.
+
 ## Timezone check (Phase A → when a stated time is ambiguous)
 
 Only when you genuinely can't tell what zone someone means and they're not yet on

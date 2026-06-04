@@ -54,6 +54,15 @@ year: e.g. 10:00 `America/New_York` is `0 14 * * 1-5` in winter (EST) and
 config, so invites land at the right local time regardless — only the *trigger*
 time needs aligning.
 
+**Cowork runtime note.** Cowork's scheduled tasks don't accept a per-task
+timezone — the cron is evaluated in the **machine's own local timezone** (whatever
+the computer running the session is set to), and firing can drift by up to ~10
+minutes. So write each cron relative to the machine's local zone; if that zone
+differs from the reference `timezone`, apply the offset yourself, and don't count
+on to-the-minute starts. The ~1-hour gap between the collect and pair runs absorbs
+the jitter comfortably, and because the pairing math still uses `timezone` from
+config, invites land at the correct local time even when the trigger drifts.
+
 ## One-off / manual runs
 
 You don't need the scheduler to run a phase. Use the `/lunch` command (e.g.

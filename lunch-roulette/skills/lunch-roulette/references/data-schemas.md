@@ -17,6 +17,7 @@ used only to interpret and convert what they type. Dates are `"YYYY-MM-DD"`.
   "collect_time": "10:00",
   "pair_time": "11:00",
   "lunch_window": { "earliest": "11:30", "latest": "14:00" },
+  "lunch_window_is_local": true,
   "default_lunch_duration_min": 60,
   "max_group_size": 3,
   "novelty_window_days": 14,
@@ -30,9 +31,21 @@ used only to interpret and convert what they type. Dates are `"YYYY-MM-DD"`.
   also the zone assumed for anyone whose own `timezone` is unknown. People in other
   zones are handled per-person (see participants.json): their stated times are
   converted into this reference zone before matching.
-- **lunch_window** — the outer bounds the bot will ever schedule lunch within,
-  expressed in the reference `timezone`. Self-reported free times are normalized to
-  the reference zone and then clipped to this.
+- **lunch_window** — the daily band the bot will ever schedule lunch within
+  (`earliest`–`latest`). How it's read depends on `lunch_window_is_local`: in
+  reference-zone mode it's a single band in the reference `timezone`; in local mode
+  it's applied to *each* person in their own home zone. Self-reported free times are
+  clipped to it either way.
+- **lunch_window_is_local** — whether `lunch_window` is one shared band in the
+  reference zone (`false`/absent) or a *per-person local* band (`true`). With
+  `true`, everyone lunches inside the same wall-clock window wherever they are (e.g.
+  11:30–14:00 local); the orchestrator converts each person's band into the
+  reference zone when it builds availability, and the matcher pairs only people
+  whose converted bands actually overlap — so two people on opposite coasts may
+  simply never align, which is expected. For a team that all shares one timezone the
+  two modes produce identical pairings. New installs default to `true` (see
+  `assets/config.example.json`); the matcher treats an absent field as `false`,
+  preserving the original single-zone behavior.
 - **novelty_window_days** — how far back the matcher looks to avoid repeats.
   A pairing inside this window is penalized; more recent = heavier penalty.
 - **max_group_size** — keep at 3. The matcher only makes a three when the count
@@ -91,7 +104,12 @@ Written in Phase A, read in Phase B. Built by the orchestrator from the
 windows here are in the reference `timezone`** — the orchestrator converts each
 person's stated times (read in their home timezone, or a zone they named in the
 message) into the reference zone before writing this file, so the matcher only ever
-sees one zone.
+sees one zone. In **local mode** (`config.lunch_window_is_local: true`) the
+orchestrator additionally clips each person to *their own* lunch band (the
+`lunch_window` read in their home zone, then converted to the reference zone) and
+**materializes flexible people as that explicit band — `free` is never null in local
+mode**, because the matcher would otherwise read a null as free all day and pair
+people whose real lunch hours don't overlap.
 
 ```json
 {
@@ -119,7 +137,9 @@ sees one zone.
 ```
 
 - **wants_lunch: false** → excluded from pairing entirely.
-- **free: null or []** → fully flexible (free across the whole lunch window).
+- **free: null or []** → fully flexible (free across the whole lunch window). In
+  local mode the orchestrator replaces this with the person's explicit local band,
+  so a null shouldn't reach the matcher there.
 - **free: [["12:00","13:00"], ...]** → one or more windows; the matcher needs an
   overlap of at least `default_lunch_duration_min` to put two people together.
 - **tz** — the timezone the `free` windows were originally given in (the person's

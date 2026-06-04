@@ -1,0 +1,56 @@
+{
+  "date": "2026-06-03",
+  "groups": [
+    {
+      "members": [
+        {
+          "email": "carol@org.com",
+          "name": "Carol",
+          "slack_id": "U3",
+          "slack_username": "carol"
+        },
+        {
+          "email": "dave@org.com",
+          "name": "Dave",
+          "slack_id": "U4",
+          "slack_username": "dave"
+        }
+      ],
+      "suggested_slot": {
+        "start": "13:00",
+        "end": "14:00"
+      },
+      "repeat_penalty": 0.0
+    },
+    {
+      "members": [
+        {
+          "email": "alice@org.com",
+          "name": "Alice",
+          "slack_id": "U1",
+          "slack_username": "alice"
+        },
+        {
+          "email": "bob@org.com",
+          "name": "Bob",
+          "slack_id": "U2",
+          "slack_username": "bob"
+        }
+      ],
+      "suggested_slot": {
+        "start": "11:30",
+        "end": "12:30"
+      },
+      "repeat_penalty": 0.0
+    }
+  ],
+  "unmatched": [
+    {
+      "email": "ivan@org.com",
+      "name": "Ivan",
+      "slack_id": "U8",
+      "slack_username": "ivan",
+      "reason": "no compatible group with overlapping free time"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Messages to the lunch bot so far this morning (today is 2026-06-03, time is ~10:00):
+[09:20] alice: in, 12-1
+[09:25] bob: out today, got a dentist appt
+[09:31] carol: yes! flexible whenever
+[09:50] nina: hey is this the lunch buddies thing? can I join?

@@ -1,0 +1,13 @@
+{
+  "timezone": "America/New_York",
+  "drive_folder": "lunch-roulette",
+  "slack_intake_channel": "#lunch-roulette",
+  "collect_time": "10:00",
+  "pair_time": "11:00",
+  "lunch_window": { "earliest": "11:30", "latest": "14:00" },
+  "default_lunch_duration_min": 60,
+  "max_group_size": 3,
+  "novelty_window_days": 14,
+  "organizer_email": "organizer@org.com",
+  "calendar_id": "primary"
+}

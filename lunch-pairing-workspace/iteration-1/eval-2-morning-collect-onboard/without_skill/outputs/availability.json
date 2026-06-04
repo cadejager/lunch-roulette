@@ -1,0 +1,102 @@
+{
+  "date": "2026-06-03",
+  "snapshot_time": "10:00",
+  "source": "messages.txt (Slack lunch bot channel)",
+  "roster_source": "participants.json",
+  "summary": {
+    "roster_size": 6,
+    "responded": 3,
+    "in": 2,
+    "out": 1,
+    "no_response": 3,
+    "new_unrostered": 1
+  },
+  "participants": [
+    {
+      "name": "Alice",
+      "email": "alice@org.com",
+      "slack_username": "alice",
+      "slack_id": "U1",
+      "on_roster": true,
+      "status": "in",
+      "window": "12:00-13:00",
+      "notes": "Responded 09:20: \"in, 12-1\".",
+      "responded": true
+    },
+    {
+      "name": "Bob",
+      "email": "bob@org.com",
+      "slack_username": "bob",
+      "slack_id": "U2",
+      "on_roster": true,
+      "status": "out",
+      "window": null,
+      "notes": "Responded 09:25: \"out today, got a dentist appt\".",
+      "responded": true
+    },
+    {
+      "name": "Carol",
+      "email": "carol@org.com",
+      "slack_username": "carol",
+      "slack_id": "U3",
+      "on_roster": true,
+      "status": "in",
+      "window": "flexible",
+      "notes": "Responded 09:31: \"yes! flexible whenever\".",
+      "responded": true
+    },
+    {
+      "name": "Dave",
+      "email": "dave@org.com",
+      "slack_username": "dave",
+      "slack_id": "U4",
+      "on_roster": true,
+      "status": "no_response",
+      "window": null,
+      "notes": "No message as of 10:00. Nudge drafted.",
+      "responded": false
+    },
+    {
+      "name": "Erin",
+      "email": "erin@org.com",
+      "slack_username": "erin",
+      "slack_id": "U5",
+      "on_roster": true,
+      "status": "no_response",
+      "window": null,
+      "notes": "No message as of 10:00. Nudge drafted.",
+      "responded": false
+    },
+    {
+      "name": "Frank",
+      "email": "frank@org.com",
+      "slack_username": "frank",
+      "slack_id": "U6",
+      "on_roster": true,
+      "status": "no_response",
+      "window": null,
+      "notes": "No message as of 10:00. Nudge drafted.",
+      "responded": false
+    },
+    {
+      "name": "Nina",
+      "email": null,
+      "slack_username": "nina",
+      "slack_id": null,
+      "on_roster": false,
+      "status": "wants_to_join",
+      "window": null,
+      "notes": "Responded 09:50: \"hey is this the lunch buddies thing? can I join?\". Not on roster yet; onboarding reply drafted and a proposed roster entry is included below. Did not state today's availability yet.",
+      "responded": true
+    }
+  ],
+  "new_participant_proposed_roster_entry": {
+    "name": "Nina",
+    "email": null,
+    "slack_id": null,
+    "slack_username": "nina",
+    "active": true,
+    "joined": "2026-06-03",
+    "_needs": "email and slack_id to be confirmed during onboarding before adding to participants.json"
+  }
+}

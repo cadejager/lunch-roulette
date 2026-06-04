@@ -1,0 +1,56 @@
+{
+  "date": "2026-06-03",
+  "responses": [
+    {
+      "email": "alice@org.com",
+      "wants_lunch": true,
+      "free": [["12:00", "13:00"]],
+      "raw": "in! i'm free 12-1",
+      "responded_at": "2026-06-03T09:31:00-04:00"
+    },
+    {
+      "email": "bob@org.com",
+      "wants_lunch": true,
+      "free": null,
+      "raw": "yes please, any time works for me",
+      "responded_at": "2026-06-03T09:33:00-04:00"
+    },
+    {
+      "email": "carol@org.com",
+      "wants_lunch": true,
+      "free": [["12:30", "13:30"]],
+      "raw": "lunch sounds good, 12:30-1:30",
+      "responded_at": "2026-06-03T09:35:00-04:00"
+    },
+    {
+      "email": "dave@org.com",
+      "wants_lunch": true,
+      "free": null,
+      "raw": "I'm up for it, flexible today",
+      "responded_at": "2026-06-03T09:40:00-04:00"
+    },
+    {
+      "email": "erin@org.com",
+      "wants_lunch": true,
+      "free": [["12:00", "14:00"]],
+      "raw": "yes — after 12 is best for me",
+      "responded_at": "2026-06-03T09:42:00-04:00"
+    },
+    {
+      "email": "frank@org.com",
+      "wants_lunch": true,
+      "free": [["11:45", "12:45"]],
+      "raw": "count me in, 11:45 to 12:45",
+      "responded_at": "2026-06-03T09:45:00-04:00"
+    },
+    {
+      "email": "grace@org.com",
+      "wants_lunch": true,
+      "free": null,
+      "raw": "i'm free, whenever",
+      "responded_at": "2026-06-03T09:50:00-04:00"
+    }
+  ],
+  "nudged": [],
+  "no_response": []
+}

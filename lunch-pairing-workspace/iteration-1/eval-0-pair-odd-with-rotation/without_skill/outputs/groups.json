@@ -1,0 +1,53 @@
+{
+  "date": "2026-06-03",
+  "respondents": 7,
+  "strategy": "Avoid any pair that shared a group in the last 2 rounds (2026-06-01, 2026-06-02); rotate the group-of-3 to members who were not in a trio recently; choose each group's time from the intersection of its members' stated availability.",
+  "avoided_recent_pairs": [
+    ["alice@org.com", "carol@org.com"],
+    ["bob@org.com", "erin@org.com"],
+    ["dave@org.com", "frank@org.com"],
+    ["dave@org.com", "grace@org.com"],
+    ["frank@org.com", "grace@org.com"],
+    ["alice@org.com", "bob@org.com"],
+    ["carol@org.com", "dave@org.com"],
+    ["erin@org.com", "frank@org.com"],
+    ["erin@org.com", "grace@org.com"]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "size": 2,
+      "members": ["alice@org.com", "frank@org.com"],
+      "member_names": ["Alice", "Frank"],
+      "time": { "start": "12:00", "end": "12:45" },
+      "time_rationale": "Intersection of Alice 12:00-13:00 and Frank 11:45-12:45 = 12:00-12:45.",
+      "novel": true
+    },
+    {
+      "id": 2,
+      "size": 2,
+      "members": ["dave@org.com", "erin@org.com"],
+      "member_names": ["Dave", "Erin"],
+      "time": { "start": "12:15", "end": "13:00" },
+      "time_rationale": "Erin is after 12:00; Dave is open. 12:15-13:00 sits comfortably after Erin's lower bound.",
+      "novel": true
+    },
+    {
+      "id": 3,
+      "size": 3,
+      "members": ["bob@org.com", "carol@org.com", "grace@org.com"],
+      "member_names": ["Bob", "Carol", "Grace"],
+      "time": { "start": "12:30", "end": "13:30" },
+      "time_rationale": "Carol is 12:30-13:30 (the only constrained member); Bob and Grace are open, so the group follows Carol's window.",
+      "novel": true
+    }
+  ],
+  "unmatched": [],
+  "collision_check": {
+    "recent_repeat_pairs_in_plan": 0,
+    "all_groups_time_feasible": true,
+    "trio_rotated_off_recent_trio_members": true,
+    "recent_trio_members_avoided": ["frank@org.com", "grace_in_trio_note"],
+    "note": "Frank and Grace were both in the trio on 2026-06-01 and 2026-06-02. Frank is placed in a pair this round. Grace is in the trio again but with two entirely new partners (Bob, Carol), so no pair repeats."
+  }
+}

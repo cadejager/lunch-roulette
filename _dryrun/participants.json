@@ -1,0 +1,12 @@
+{
+  "participants": [
+    { "name": "Alice Rivera", "email": "alice@org.com", "slack_id": "U01ALICE", "slack_username": "alice", "timezone": "America/New_York",    "active": true,  "joined": "2026-06-01" },
+    { "name": "Bob Chen",     "email": "bob@org.com",   "slack_id": "U02BOBCH", "slack_username": "bob",   "timezone": "America/Los_Angeles", "active": true,  "joined": "2026-06-01" },
+    { "name": "Carol Diaz",   "email": "carol@org.com", "slack_id": "U03CAROL", "slack_username": "carol", "timezone": "America/New_York",    "active": true,  "joined": "2026-06-01" },
+    { "name": "Dave Kim",     "email": "dave@org.com",  "slack_id": "U04DAVEK", "slack_username": "dave",  "timezone": "America/Chicago",     "active": true,  "joined": "2026-06-01" },
+    { "name": "Erin Park",    "email": "erin@org.com",  "slack_id": "U05ERINP", "slack_username": "erin",  "timezone": "America/New_York",    "active": true,  "joined": "2026-06-01" },
+    { "name": "Frank Ng",     "email": "frank@org.com", "slack_id": "U06FRANK", "slack_username": "frank", "timezone": "Europe/London",       "active": true,  "joined": "2026-06-02" },
+    { "name": "Grace Lee",    "email": "grace@org.com", "slack_id": "U07GRACE", "slack_username": "grace", "timezone": "America/New_York",    "active": true,  "joined": "2026-06-02" },
+    { "name": "Heidi Wood",   "email": "heidi@org.com", "slack_id": "U08HEIDI", "slack_username": "heidi", "timezone": "America/New_York",    "active": false, "joined": "2026-06-01" }
+  ]
+}

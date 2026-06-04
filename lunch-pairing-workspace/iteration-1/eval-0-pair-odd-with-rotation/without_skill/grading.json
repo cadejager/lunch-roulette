@@ -1,0 +1,45 @@
+{
+  "expectations": [
+    {
+      "text": "All seven participants are placed into a group; nobody is dropped",
+      "passed": true,
+      "evidence": "groups.json: Alice+Frank, Dave+Erin, Bob+Carol+Grace = 7 people; \"Unmatched: none\"."
+    },
+    {
+      "text": "Group sizes are 2, 2, and 3 \u2014 exactly one group of three for the odd headcount",
+      "passed": true,
+      "evidence": "Two pairs (Alice+Frank, Dave+Erin) and one trio (Bob, Carol, Grace). Exactly one group of three."
+    },
+    {
+      "text": "Pairings rotate: at most one pair repeats a pair from the previous two days",
+      "passed": true,
+      "evidence": "recent_repeat_pairs_in_plan: 0. Pairs Alice-Frank, Dave-Erin, Bob-Carol, Bob-Grace, Carol-Grace none appear in 06-01/06-02 history. 0 repeats."
+    },
+    {
+      "text": "Each group's suggested lunch time fits inside every member's stated free window",
+      "passed": true,
+      "evidence": "Alice(12-1)/Frank(11:45-12:45) @12:00-12:45; Dave(flexible)/Erin(after 12) @12:15-13:00; Bob(any)/Carol(12:30-13:30)/Grace(any) @12:30-13:30. All fit."
+    },
+    {
+      "text": "A calendar invite is drafted for each group with a summary, the members' email addresses as attendees, and a start/end time",
+      "passed": true,
+      "evidence": "drafts.md has 3 invites, each with Summary, Attendees as emails, and Start/End on 2026-06-03."
+    },
+    {
+      "text": "A Slack message is drafted for each matched person telling them their match and time",
+      "passed": true,
+      "evidence": "drafts.md has 7 per-person Slack messages naming match and the calendar hold time."
+    },
+    {
+      "text": "No calendar event is actually created and no message is actually sent (dry run respected)",
+      "passed": true,
+      "evidence": "Header: \"DRY RUN. Nothing below has been sent or created.\" Exact invites/messages shown but not executed."
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "pass_rate": 1.0
+  }
+}

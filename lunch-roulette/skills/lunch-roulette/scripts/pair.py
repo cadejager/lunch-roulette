@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
-"""Pair lunch participants into groups of two (one group of three when the
-count is odd), avoiding recent repeats and respecting self-reported
-availability windows.
+"""Pair lunch participants into groups of two (one group of three when the count
+is odd), avoiding recent repeats, working entirely in **UTC**.
 
-This is a pure, deterministic function of its inputs: given the same date,
-availability, and history it always returns the same groups, but different
-days produce different shuffles so pairings rotate over time. That property
-is what makes it testable and what keeps day-to-day pairings fresh.
+Every time here is a UTC ``"HH:MM"`` clock time on the availability date. By the
+time the matcher runs, the orchestrator has already, for each person:
+
+  * converted their stated local windows into UTC,
+  * clipped them to that person's *own* local lunch window, and
+  * materialized a "flexible / any time" person as an explicit UTC band,
+
+so this script needs nothing but interval overlap — **no timezone logic and no
+lunch-window logic live here anymore.** Two people match when their free UTC
+intervals overlap by at least the lunch duration; whoever can't overlap anyone is
+returned as unmatched (never forced into a group).
+
+It is a pure, deterministic function of its inputs: the same date + availability +
+history always yields the same groups, but the per-day seed reshuffles ties so
+pairings rotate across days. That is what makes it testable and keeps pairings
+fresh.
 
 Usage:
     python pair.py --availability avail.json --history history.json \
         --config config.json --participants participants.json --out groups.json
 
-Only --availability is strictly required; everything else has sane defaults.
-Run with no --out to print the result to stdout.
-
-All inputs and outputs are JSON. See references/data-schemas.md for the shapes.
-Standard library only — no third-party dependencies.
+Only --availability is required. --history is the *aggregated* past rounds
+(``{"rounds": [{"date", "groups"}]}``) the orchestrator builds from the per-run
+round files in Drive. Standard library only.
 """
 
 from __future__ import annotations
@@ -28,22 +37,21 @@ import sys
 from datetime import date as date_cls
 
 # --- Defaults -------------------------------------------------------------
-# These are overridden by config.json when present. They exist so the script
-# does something reasonable even with a bare availability file.
+# Overridden by config.json when present. No lunch_window here on purpose — the
+# orchestrator has already clipped every interval to each person's local window.
 DEFAULTS = {
-    "default_lunch_duration_min": 60,
-    "lunch_window": {"earliest": "11:30", "latest": "14:00"},
-    "novelty_window_days": 14,
+    "default_lunch_duration_min": 30,
     "max_group_size": 3,
-    # How many randomized restarts of the greedy matcher to try. The penalty
-    # landscape is simple, so a few hundred is plenty even for ~60 people.
+    "novelty_window_days": 14,
+    # Randomized restarts of the greedy matcher. The penalty landscape is simple,
+    # so a few hundred is plenty even for ~60 people.
     "restarts": 500,
 }
 
 
-# --- Time helpers ---------------------------------------------------------
+# --- Time helpers (all UTC) ----------------------------------------------
 def to_minutes(hhmm: str) -> int:
-    """'13:30' -> 810. Minutes since midnight."""
+    """'13:30' -> 810. Minutes since 00:00 UTC."""
     h, m = hhmm.strip().split(":")
     return int(h) * 60 + int(m)
 
@@ -75,8 +83,8 @@ def common_free(members: list[dict]) -> list[list[int]]:
 
 
 def earliest_slot(intervals: list[list[int]], duration: int) -> list[int] | None:
-    """Earliest [start, end] sub-interval of length `duration` that fits in
-    one of the given intervals. Returns None if nothing fits."""
+    """Earliest [start, end] sub-interval of length `duration` that fits inside
+    one of the given intervals, or None if nothing fits."""
     for s, e in sorted(intervals):
         if e - s >= duration:
             return [s, s + duration]
@@ -84,22 +92,19 @@ def earliest_slot(intervals: list[list[int]], duration: int) -> list[int] | None
 
 
 # --- Loading & normalization ---------------------------------------------
-def build_free_intervals(free: list | None, window: list[int]) -> list[list[int]]:
-    """Turn a person's self-reported free windows into minute intervals,
-    clipped to the lunch window. An empty/missing list means "flexible" —
-    free across the whole lunch window."""
-    if not free:
-        return [list(window)]
+def parse_free_utc(free_utc: list | None) -> list[list[int]]:
+    """Turn a person's UTC free windows (``[["HH:MM","HH:MM"], ...]``) into minute
+    intervals. The orchestrator supplies closed UTC intervals already clipped to
+    the person's lunch window, so there is nothing to clip or fill here; anything
+    malformed (open-ended or zero-length) is simply dropped."""
     out: list[list[int]] = []
-    for item in free:
-        s = to_minutes(item[0])
-        e = to_minutes(item[1])
-        lo, hi = max(s, window[0]), min(e, window[1])
-        if hi > lo:
-            out.append([lo, hi])
-    # If everything they said falls outside the lunch window, fall back to
-    # flexible rather than dropping them — they opted in, after all.
-    return out or [list(window)]
+    for item in free_utc or []:
+        if not item or item[0] is None or item[1] is None:
+            continue
+        s, e = to_minutes(item[0]), to_minutes(item[1])
+        if e > s:
+            out.append([s, e])
+    return out
 
 
 def load_participants(path: str | None) -> dict[str, dict]:
@@ -108,15 +113,15 @@ def load_participants(path: str | None) -> dict[str, dict]:
         return {}
     with open(path) as f:
         data = json.load(f)
-    return {p["email"]: p for p in data.get("participants", [])}
+    return {p["email"]: p for p in data.get("participants", []) if p.get("email")}
 
 
 def recency_penalties(
     history: dict, today: str, window_days: int
 ) -> dict[frozenset, float]:
     """Penalty for re-pairing two people, summed over past rounds inside the
-    novelty window. More recent shared lunches weigh more, so the matcher
-    avoids immediate repeats hardest and old ones only mildly."""
+    novelty window. More recent shared lunches weigh more, so the matcher avoids
+    immediate repeats hardest and old ones only mildly."""
     pen: dict[frozenset, float] = {}
     today_d = date_cls.fromisoformat(today)
     for rnd in history.get("rounds", []):
@@ -142,8 +147,8 @@ def pair_penalty(pen: dict[frozenset, float], a: str, b: str) -> float:
 
 
 def compatible(p: dict, q: dict, duration: int) -> bool:
-    """Two people can share lunch if their free windows overlap by at least
-    the lunch duration."""
+    """Two people can share lunch if their free windows overlap by at least the
+    lunch duration."""
     return earliest_slot(intersect_intervals(p["intervals"], q["intervals"]), duration) is not None
 
 
@@ -165,8 +170,8 @@ def greedy_round(people: list[dict], pen, duration, rng) -> tuple[list[tuple], l
         ]
         if not candidates:
             continue
-        # Lowest repeat penalty wins; the prior shuffle breaks ties, which is
-        # what rotates pairings on days when penalties are all equal.
+        # Lowest repeat penalty wins; the prior shuffle breaks ties, which is what
+        # rotates pairings on days when penalties are all equal.
         q = min(candidates, key=lambda q: pair_penalty(pen, p["email"], q["email"]))
         pairs.append((p["email"], q["email"]))
         used.add(p["email"])
@@ -176,10 +181,10 @@ def greedy_round(people: list[dict], pen, duration, rng) -> tuple[list[tuple], l
 
 
 def attach_leftovers(pairs, leftovers, people_by_email, pen, duration, max_group_size):
-    """Fold each leftover person into the cheapest compatible existing pair to
-    form a triple. Returns (groups, unmatched) where groups are lists of
-    emails. Normally there is at most one leftover (odd count); availability
-    gaps can produce more, which surface as unmatched."""
+    """Fold each leftover person into the cheapest compatible existing pair to form
+    a triple. Returns (groups, unmatched) where groups are lists of emails.
+    Normally there is at most one leftover (odd count); availability gaps can
+    produce more, which surface as unmatched."""
     groups = [list(pr) for pr in pairs]
     unmatched: list[dict] = []
     for lp in leftovers:
@@ -219,7 +224,7 @@ def match(people: list[dict], pen, duration, max_group_size, seed, restarts):
     penalty. Matching everyone matters most — nobody should be left out for the
     sake of a marginally fresher pairing."""
     people_by_email = {p["email"]: p for p in people}
-    best = None  # (num_unmatched, num_triples, penalty, groups, unmatched)
+    best = None  # (key, groups, unmatched)
     rng = random.Random(seed)
     for _ in range(restarts):
         pairs, leftovers = greedy_round(people, pen, duration, rng)
@@ -240,34 +245,19 @@ def match(people: list[dict], pen, duration, max_group_size, seed, restarts):
 # --- Orchestration --------------------------------------------------------
 def compute(availability: dict, history: dict, config: dict, participants: dict):
     cfg = {**DEFAULTS, **(config or {})}
-    window = [
-        to_minutes(cfg["lunch_window"]["earliest"]),
-        to_minutes(cfg["lunch_window"]["latest"]),
-    ]
-    # Local-window mode: each person lunches inside *their own* local band (e.g.
-    # 11:30-14:00 wherever they are), so the orchestrator has already converted
-    # everyone's band into the reference zone, clipped their stated free time to
-    # it, and materialized "flexible" people as an explicit band (no nulls). Two
-    # people on opposite coasts simply won't overlap, and that's intended.
-    # Re-clipping to one global window here would wrongly chop off anyone whose
-    # local band sits outside it (a Pacific lunch seen from an Eastern
-    # reference), so widen the clip to the whole day and trust the pre-clipped
-    # intervals. Default (flag absent/false) keeps the single-reference-zone
-    # behavior, which is identical for a team that all shares one timezone.
-    if cfg.get("lunch_window_is_local"):
-        window = [0, 24 * 60]
     duration = int(cfg["default_lunch_duration_min"])
     today = availability.get("date") or date_cls.today().isoformat()
 
-    # Only people who opted in today.
+    # Only people who can actually be matched: opted in today, have a calendar
+    # identity (email), and have at least one usable UTC window.
     people: list[dict] = []
     for r in availability.get("responses", []):
-        if not r.get("wants_lunch", True):
+        if not r.get("email"):
             continue
-        people.append({
-            "email": r["email"],
-            "intervals": build_free_intervals(r.get("free"), window),
-        })
+        intervals = parse_free_utc(r.get("free_utc"))
+        if not intervals:
+            continue
+        people.append({"email": r["email"], "intervals": intervals})
 
     result = {"date": today, "groups": [], "unmatched": []}
 
@@ -275,7 +265,7 @@ def compute(availability: dict, history: dict, config: dict, participants: dict)
         for p in people:
             result["unmatched"].append({
                 "email": p["email"],
-                "reason": "only one person opted in today — no match possible",
+                "reason": "only one person available today — no match possible",
             })
         return result
 
@@ -301,33 +291,36 @@ def compute(availability: dict, history: dict, config: dict, participants: dict)
         slot = earliest_slot(common_free(members), duration)
         result["groups"].append({
             "members": [enrich(e) for e in g],
-            "suggested_slot": (
+            "slot_utc": (
                 {"start": to_hhmm(slot[0]), "end": to_hhmm(slot[1])} if slot else None
             ),
             "repeat_penalty": round(total_penalty([g], pen), 1),
         })
 
     for u in unmatched:
-        u_enriched = {**enrich(u["email"]), "reason": u["reason"]}
-        result["unmatched"].append(u_enriched)
+        result["unmatched"].append({**enrich(u["email"]), "reason": u["reason"]})
 
     return result
 
 
 def _load(path: str | None, default):
+    """Load JSON, or fall back to `default` if the path is missing, empty, or
+    unparseable. An autonomous run should degrade (e.g. no rotation history) rather
+    than crash on a missing or half-written file."""
     if not path:
         return default
     try:
         with open(path) as f:
-            return json.load(f)
-    except FileNotFoundError:
+            text = f.read().strip()
+        return json.loads(text) if text else default
+    except (FileNotFoundError, json.JSONDecodeError):
         return default
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Pair lunch participants.")
-    ap.add_argument("--availability", required=True, help="today's availability JSON")
-    ap.add_argument("--history", help="past rounds JSON")
+    ap = argparse.ArgumentParser(description="Pair lunch participants (UTC).")
+    ap.add_argument("--availability", required=True, help="today's availability JSON (UTC)")
+    ap.add_argument("--history", help="aggregated past rounds: {'rounds': [...]}")
     ap.add_argument("--config", help="config JSON")
     ap.add_argument("--participants", help="roster JSON (for names/slack ids)")
     ap.add_argument("--out", help="write result here (default: stdout)")

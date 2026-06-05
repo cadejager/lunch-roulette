@@ -88,19 +88,27 @@ matched while later ones are still waking up.
 3. **Persist the roster.** If `roster` changed (new members, filled email/tz,
    departures), write a new `participants-<ts>.json` to Drive.
 4. **Build today's availability — convert to UTC.** For each person in `today`:
-   convert each `free_local` window from their `tz` into **UTC** (use Python /
-   `zoneinfo` for that date — never eyeball DST), clip to that person's
-   `lunch_window_local` converted to UTC, and materialize a flexible person
-   (`free_local: null`) as their whole local band in UTC. Merge with today's existing
-   availability, **carry `paired` forward**, record `pending` (wants lunch but
-   missing email/tz) and `flagged`, and write a new `availability-<DATE>-<ts>.json`.
+   convert each `free_local` window from its `tz` into **UTC** (Python `zoneinfo` for
+   that date — never eyeball DST) and store it as `free_utc`, recording the source
+   zone as `stated_tz` (the messenger's `tz`) and keeping `raw` for audit. Clip each
+   window to that person's `lunch_window_local` converted to UTC, and materialize a
+   flexible person (`free_local: null`) as their whole local band in UTC. Merge with
+   today's existing availability and **carry `paired` forward**. Record the
+   messenger's `asked` people as `pending`, copy `flagged` through, and write a new
+   `availability-<DATE>-<ts>.json`.
 5. **Surface flagged.** Note anything in `flagged` for the organizer; never act on it.
-6. **Choose who to pair now (just-in-time).** From today's availability take people
-   who have an email, have a `free_utc` window, and are **not already in `paired`**,
-   whose **lunch window opens before the next scheduled run** (waiting another hour
-   would risk their lunch). On the **last run of the day**, take everyone still
-   unpaired and ready — there's no later run to catch them. If fewer than two
-   qualify, stop; a later run will get them.
+6. **Work out timing, then choose who to pair now (just-in-time).** From
+   `config.run_schedule` (`from`–`to` every `every_min` minutes, in its `tz`) and the
+   current time, compute **when the next run will be** and whether **this is the last
+   run of the day**. Then, from today's availability, consider everyone who has an
+   email + timezone, isn't already in `paired`, and still has at least one `free_utc`
+   window that hasn't passed. Pair **now** anyone whose lunch is *due* — one of their
+   remaining windows opens at or before the next run (plus a short lead so the invite
+   arrives in time); waiting for the next run would let their lunch start. Anyone
+   whose earliest remaining window is comfortably later can **wait** — leave them in
+   availability and a later run pairs them. On the **last run of the day**, treat
+   everyone still unpaired and ready as due (no later run will catch them). If fewer
+   than two people are due, there's nothing to pair this run.
 7. **Pair.** Aggregate the recent round files into `{"rounds":[...]}` and run the
    matcher on just that pool:
    ```bash
@@ -129,10 +137,15 @@ matched while later ones are still waking up.
    ```
    Then add the newly matched slack_ids to availability `paired` and write a new
    availability version. Do this **after** invites go out, so a retry is safe.
-10. **Notify.** Spawn the messenger in NOTIFY: for each matched person give their
-    partner name(s) and the slot **in their own timezone** (convert `slot_utc` →
-    their `timezone` with `zoneinfo`) and the `ts` of their message to thread under;
-    plus a kind heads-up for anyone `unmatched`. The messenger writes and posts.
+10. **Notify.** Spawn the messenger in NOTIFY. For each **matched** person, give
+    their partner name(s), the slot **in their own timezone** (convert `slot_utc` →
+    their `timezone` with `zoneinfo`), and the `ts` of their message to thread under —
+    a "your lunch is coming up" ping. For anyone the matcher left **unmatched this
+    run, only send a no-match heads-up if it's now hopeless**: either this is the
+    **last run of the day**, or **all of their offered windows will have passed by the
+    next run** (nothing left to try). Otherwise say nothing — they stay in
+    availability and a later run tries again, so never tell someone there's no match
+    while they could still get one. The messenger writes and posts.
 
 ## Converting times — do it in code
 

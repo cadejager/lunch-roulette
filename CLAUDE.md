@@ -61,11 +61,10 @@ When changing behavior, update the script **and** its test **and** the matching 
 
 **5. Just-in-time hourly pairing.** A scheduled run fires hourly across the team's morning (`config.run_schedule`). Every run does the *same* job — sync the channel, then pair only the people whose lunch is "due" before the **next** run; everyone else waits for a later run. Someone is told "no match" only when it's hopeless (the last run, or all their windows pass by the next run). There is **no separate collect/pair phase**. The two entry points (`commands/lunch.md`) are `/lunch setup` (first-time) and `/lunch run` / blank (the hourly job).
 
-## Deployment & runtime notes (not visible from the source)
+## Runtime notes (not visible from the source)
 
 Hard-won context from running this in Cowork — you can't infer these from the files:
 
-- **The repo is ahead of production.** This repo is v2 (`lunch-roulette`, v0.3.0); the live team is still on an **older `lunch-pairing` v0.1.0** package (Drive folder `lunch-pairing`, the old two-phase model). v2 has **not been redeployed** — changes here don't affect the live bot until someone redeploys. *(True as of 2026-06-05; remove this bullet once redeployed.)*
 - **Scheduled Cowork sessions are ephemeral** — the local filesystem does not survive between runs, which is *why* state lives in Drive (append-only). Treat `./_work/` as throwaway scratch.
 - **Cron fires in the host machine's local timezone, with ~10 min jitter** — not a per-task configurable zone. Offset the schedule from the host zone to the team's, and don't expect to-the-minute starts (see `references/scheduling.md`).
 - **Slack profiles usually expose email + timezone**, so onboarding *reads* them and only asks in-channel when one is genuinely hidden. (Day one produced zero lunches because the deployed bot asked instead of reading — don't regress that.)

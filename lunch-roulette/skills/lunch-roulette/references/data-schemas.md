@@ -123,7 +123,6 @@ in) into UTC and clipped them to that person's local lunch window.
       "slack_id": "U0B860V7KJR",
       "email": "steve@n8hfi.net",
       "free_utc": [["15:45", "16:15"], ["18:00", "18:30"]],
-      "stated": "10:45-11:15 and 1-1:30",
       "stated_tz": "America/Chicago",
       "raw": "free 10:45-11:15 and 1-1:30 my time",
       "responded_at": "2026-06-04T15:30:00Z"
@@ -139,12 +138,13 @@ in) into UTC and clipped them to that person's local lunch window.
   several). Closed intervals only; the orchestrator has already clipped open ends
   ("after 12:30") and materialized "flexible" people as their full local band in
   UTC, so a `null` never reaches the matcher.
-- **stated / stated_tz / raw** — the original numbers, the zone they were given
-  in, and the verbatim message. Audit only — the matcher reads `free_utc`.
+- **stated_tz / raw** — the zone the windows were given in (the `tz` the messenger
+  reported) and the verbatim message. Audit only — the matcher reads `free_utc`.
 - **paired** — slack_ids already matched earlier today, so later runs skip them
   (pairing is incremental across the day; nobody is matched twice).
 - **pending** — people who want lunch today but can't be matched yet because
-  they're missing an email/timezone (the messenger has asked them).
+  they're missing an email/timezone. Sourced from the messenger's `asked` list (it
+  pinged them this run for what's missing).
 - **flagged** — messages that tried to instruct the bot; surfaced to the organizer,
   never acted on.
 
@@ -226,10 +226,14 @@ instructions.
 - `roster` is reconciled to channel membership with email/timezone filled from
   profiles (`email`/`timezone` may be `null`). The orchestrator persists it as a
   new `participants-<ts>.json`.
-- `today` is keyed by `slack_id` with free windows **in the stated local
-  timezone** (`free_local`, a list; `null` = flexible). The orchestrator joins to
-  the roster for the email, converts each window `(tz) → UTC`, clips to the
+- `today` is keyed by `slack_id` with free windows **in the stated local timezone**
+  (`free_local`, a list; `null` = flexible), the `tz` they were given in, and the
+  verbatim `raw`. The orchestrator joins to the roster for the email, converts each
+  window `(tz) → UTC` into `free_utc`, stores that `tz` as `stated_tz`, clips to the
   person's lunch window, and writes `availability-<DATE>-<ts>.json`.
+- `asked` is whom the messenger pinged this run for a missing email/timezone; the
+  orchestrator records them as availability `pending`. `flagged` is surfaced to the
+  organizer and never acted on.
 
 **NOTIFY** (after pairing) — the orchestrator hands the messenger, per person:
 their match (partner names), the lunch time **already formatted in that person's

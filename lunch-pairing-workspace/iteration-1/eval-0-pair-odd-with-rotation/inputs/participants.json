@@ -1,9 +1,0 @@
-{"participants":[
- {"name":"Alice","email":"alice@org.com","slack_id":"U1","slack_username":"alice","active":true,"joined":"2026-05-01"},
- {"name":"Bob","email":"bob@org.com","slack_id":"U2","slack_username":"bob","active":true,"joined":"2026-05-01"},
- {"name":"Carol","email":"carol@org.com","slack_id":"U3","slack_username":"carol","active":true,"joined":"2026-05-01"},
- {"name":"Dave","email":"dave@org.com","slack_id":"U4","slack_username":"dave","active":true,"joined":"2026-05-01"},
- {"name":"Erin","email":"erin@org.com","slack_id":"U5","slack_username":"erin","active":true,"joined":"2026-05-01"},
- {"name":"Frank","email":"frank@org.com","slack_id":"U6","slack_username":"frank","active":true,"joined":"2026-05-01"},
- {"name":"Grace","email":"grace@org.com","slack_id":"U7","slack_username":"grace","active":true,"joined":"2026-05-01"}
-]}

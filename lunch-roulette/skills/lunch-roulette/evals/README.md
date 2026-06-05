@@ -35,11 +35,13 @@ messenger misparsing a time or the orchestrator mis-converting it?).
 
 ## Eval format
 
-Every eval (in all three JSON files) has the same shape:
+Each file declares its `target` once at the top
+(`"target": "messenger" | "orchestrator" | "integration"`), then an `evals` array
+whose entries have the shape:
 
 ```jsonc
 {
-  "id": "...", "target": "messenger | orchestrator | integration",
+  "id": "...",
   "name": "...", "intent": "what this checks and why",
   "setup":  { ... },   // the stubbed "world" the agent is given, inline
   "prompt": "...",     // the dry-run instruction (see below)

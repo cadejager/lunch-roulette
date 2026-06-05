@@ -127,6 +127,24 @@ def test_scenario_unmatchable_notified_only_at_last_run():
     assert schedule.should_notify_unmatched("2026-06-04T16:00:00Z", RS, DATE, C["free_utc"]) is True
 
 
+@case
+def test_naive_now_is_read_as_utc():
+    # A timezone-naive --now must be interpreted as UTC, never the box's local
+    # zone (the deployment machine is on Mountain time). Otherwise scheduling
+    # silently shifts hours and can flip is_last_run.
+    assert schedule._parse_now("2026-06-04T12:00:00") == schedule._parse_now("2026-06-04T12:00:00Z")
+    assert schedule.is_last_run("2026-06-04T12:00:00", RS, DATE) == schedule.is_last_run("2026-06-04T12:00:00Z", RS, DATE)
+
+
+@case
+def test_tolerates_malformed_windows():
+    # Null / open-ended elements in free_utc must not crash schedule.py (pair.py
+    # tolerates malformed windows too); they're simply skipped.
+    resps = [{"slack_id": "A", "email": "a@x", "free_utc": [["12:30", None], ["12:30", "13:00"]]}]
+    schedule.due_now("2026-06-04T12:00:00Z", RS, DATE, resps)
+    schedule.should_notify_unmatched("2026-06-04T12:00:00Z", RS, DATE, [["12:30", None]])
+
+
 def main():
     failed = 0
     for fn in CASES:

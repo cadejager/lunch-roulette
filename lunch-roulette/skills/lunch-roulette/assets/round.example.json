@@ -1,0 +1,7 @@
+{
+  "date": "2026-06-04",
+  "groups": [
+    ["alice@org.com", "bob@org.com"],
+    ["carol@org.com", "dave@org.com", "erin@org.com"]
+  ]
+}

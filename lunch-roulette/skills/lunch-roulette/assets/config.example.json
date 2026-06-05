@@ -1,14 +1,13 @@
 {
-  "timezone": "America/New_York",
   "drive_folder": "lunch-roulette",
-  "slack_intake_channel": "#lunch-roulette",
-  "collect_time": "10:00",
-  "pair_time": "11:00",
-  "lunch_window": { "earliest": "11:30", "latest": "14:00" },
-  "lunch_window_is_local": true,
-  "default_lunch_duration_min": 60,
+  "timezone": "America/New_York",
+  "channel_id": "",
+  "channel_name": "lunch-roulette",
+  "lunch_window_local": { "earliest": "10:00", "latest": "14:00" },
+  "default_lunch_duration_min": 30,
   "max_group_size": 3,
   "novelty_window_days": 14,
   "organizer_email": "you@org.com",
-  "calendar_id": "primary"
+  "calendar_id": "primary",
+  "run_schedule": { "tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60 }
 }

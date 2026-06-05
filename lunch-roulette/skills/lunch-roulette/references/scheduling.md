@@ -1,72 +1,60 @@
-# Scheduling the two daily runs (Claude Cowork)
+# Scheduling the daily runs (Claude Cowork)
 
-The orchestrator fires twice every workday. In Cowork, set up **two scheduled
-tasks** — one per phase. Each task wakes a fresh session with a prompt that names
-the phase and triggers this skill.
+The orchestrator fires **hourly across the team's morning**. Each run is the same
+job — sync the channel, then pair anyone whose lunch is imminent (see SKILL.md →
+"The daily run"). There is no separate collect/pair phase anymore; pairing happens
+just in time, so early timezones get matched while later ones are still waking up.
 
-## Recommended schedule
+## When it should run
 
-| Phase | When | Cron (weekdays) | What it does |
-|-------|------|-----------------|--------------|
-| A — collect & nudge | ~10:00 | `0 10 * * 1-5` | Messenger reads Slack; orchestrator builds today's availability in Drive, nudges non-responders, onboards new joiners |
-| B — pair & invite | ~11:00 | `0 11 * * 1-5` | Orchestrator pairs everyone, sends Calendar invites, has the messenger DM people, records history to Drive |
+The ideal window is **8:00 in the earliest participant's timezone through ~noon in
+the latest participant's timezone**, every hour. For a team spanning US Eastern and
+Pacific that's 8:00 ET → 12:00 PT, i.e. five-ish hourly fires.
 
-The hour-ish gap gives people nudged at 10:00 time to reply before pairing at
-11:00.
+For simplicity, the default `config.run_schedule` is **hourly, 08:00–12:00 in the
+team's `timezone`** (e.g. ET):
 
-## Invocation prompts
+```json
+"run_schedule": { "tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60 }
+```
 
-Give each task a prompt that names the phase so the skill doesn't have to guess:
+Widen `to` (and/or set `tz` thinking) at setup if the team reaches far-west zones.
+Each run also **no-ops if it fires outside the active window**, so an over-broad cron
+is harmless.
 
-- **Phase A:** `Run the lunch-roulette skill — Phase A (collect & nudge) for today.`
-- **Phase B:** `Run the lunch-roulette skill — Phase B (pair & invite) for today.`
+## Cowork runtime caveats (important)
 
-## Setting them up in Cowork
+- **Cron fires in the machine's local timezone**, not a per-task one — whatever zone
+  the computer running the session is on. Write the cron relative to *that* zone and
+  offset from the team zone yourself. Example: team on ET, machine on Mountain →
+  08:00–12:00 ET is **06:00–10:00 MT**, so `0 6-10 * * 1-5`.
+- **Firing drifts by up to ~10 minutes** (dispatch jitter). The hourly cadence and
+  the just-in-time pairing (which only matches people whose lunch is still an hour+
+  out) absorb this comfortably, and invites land at the right local time regardless
+  because all the math is in UTC.
 
-Create two recurring scheduled tasks (via Cowork's scheduled-tasks feature):
+## Setting it up in Cowork
 
-1. **Lunch — collect**, weekdays at 10:00 in the team timezone, prompt = the
-   Phase A prompt above.
-2. **Lunch — pair**, weekdays at 11:00 in the team timezone, prompt = the Phase B
-   prompt above.
+Create **one recurring scheduled task** that fires hourly across the active window,
+with the prompt:
 
-Make sure each scheduled session has the **Slack, Google Calendar, and Google
-Drive** connectors available — the orchestrator needs Calendar + Drive, and the
-`lunch-messenger` subagent it spawns needs Slack.
+> `Run the lunch-roulette skill for today.`
+
+(No phase argument — every run is the same job.) Make sure the scheduled session has
+the **Slack, Google Calendar, and Google Drive** connectors available: the
+orchestrator needs Calendar + Drive, and the `lunch-messenger` it spawns needs Slack.
 
 ## Running more than one team at once
 
-Each independent pairing (say, two different teams) is just its own Drive
-`drive_folder` plus its own pair of scheduled tasks. Give each its own config with a
-distinct `drive_folder` and `slack_intake_channel`, name the scheduled tasks so you
-can tell them apart (e.g. "Lunch (design) — collect"), and point each task's prompt
-at the same skill. They share the plugin and the `lunch-messenger`; they don't share
-data, so histories and rosters stay separate.
-
-## Timezone
-
-Set the scheduled task's timezone to the **reference** timezone (the same value as
-`timezone` in `config.json`). That avoids the daylight-saving math entirely.
-
-If your scheduler only fires in UTC, you'll have to convert and adjust twice a
-year: e.g. 10:00 `America/New_York` is `0 14 * * 1-5` in winter (EST) and
-`0 13 * * 1-5` in summer (EDT). The pairing math always uses `timezone` from
-config, so invites land at the right local time regardless — only the *trigger*
-time needs aligning.
-
-**Cowork runtime note.** Cowork's scheduled tasks don't accept a per-task
-timezone — the cron is evaluated in the **machine's own local timezone** (whatever
-the computer running the session is set to), and firing can drift by up to ~10
-minutes. So write each cron relative to the machine's local zone; if that zone
-differs from the reference `timezone`, apply the offset yourself, and don't count
-on to-the-minute starts. The ~1-hour gap between the collect and pair runs absorbs
-the jitter comfortably, and because the pairing math still uses `timezone` from
-config, invites land at the correct local time even when the trigger drifts.
+Each independent pairing is its own Drive `drive_folder` + intake channel + its own
+scheduled task. Give each its own `config.json` with a distinct `drive_folder`,
+`channel_id`, and `run_schedule`, and name the tasks so you can tell them apart
+(e.g. "Lunch (design)"). They share the plugin and the `lunch-messenger`; they don't
+share data, so rosters and histories stay separate.
 
 ## One-off / manual runs
 
-You don't need the scheduler to run a phase. Use the `/lunch` command (e.g.
-`/lunch setup` to onboard a new team, `/lunch collect` or `/lunch pair`), or just
-ask — "run today's lunch roulette" —
-and the skill works out the phase from whether today's availability file exists in
-Drive yet. Handy for testing, holidays, or catching up after a missed run.
+You don't need the scheduler to run. Use `/lunch` (or `/lunch setup` to onboard a
+new team), or just ask — "run today's lunch roulette." Handy for testing, holidays,
+or catching up after a missed run; a manual run does exactly what a scheduled one
+does.

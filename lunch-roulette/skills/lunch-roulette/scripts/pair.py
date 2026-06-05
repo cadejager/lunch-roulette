@@ -244,6 +244,18 @@ def compute(availability: dict, history: dict, config: dict, participants: dict)
         to_minutes(cfg["lunch_window"]["earliest"]),
         to_minutes(cfg["lunch_window"]["latest"]),
     ]
+    # Local-window mode: each person lunches inside *their own* local band (e.g.
+    # 11:30-14:00 wherever they are), so the orchestrator has already converted
+    # everyone's band into the reference zone, clipped their stated free time to
+    # it, and materialized "flexible" people as an explicit band (no nulls). Two
+    # people on opposite coasts simply won't overlap, and that's intended.
+    # Re-clipping to one global window here would wrongly chop off anyone whose
+    # local band sits outside it (a Pacific lunch seen from an Eastern
+    # reference), so widen the clip to the whole day and trust the pre-clipped
+    # intervals. Default (flag absent/false) keeps the single-reference-zone
+    # behavior, which is identical for a team that all shares one timezone.
+    if cfg.get("lunch_window_is_local"):
+        window = [0, 24 * 60]
     duration = int(cfg["default_lunch_duration_min"])
     today = availability.get("date") or date_cls.today().isoformat()
 

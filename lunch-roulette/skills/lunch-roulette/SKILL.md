@@ -87,28 +87,32 @@ matched while later ones are still waking up.
    `flagged`.
 3. **Persist the roster.** If `roster` changed (new members, filled email/tz,
    departures), write a new `participants-<ts>.json` to Drive.
-4. **Build today's availability — convert to UTC.** For each person in `today`:
-   convert each `free_local` window from its `tz` into **UTC** (Python `zoneinfo` for
-   that date — never eyeball DST) and store it as `free_utc`, recording the source
-   zone as `stated_tz` (the messenger's `tz`) and keeping `raw` for audit. Clip each
-   window to that person's `lunch_window_local` converted to UTC, and materialize a
-   flexible person (`free_local: null`) as their whole local band in UTC. Merge with
-   today's existing availability and **carry `paired` forward**. Record the
-   messenger's `asked` people as `pending`, copy `flagged` through, and write a new
-   `availability-<DATE>-<ts>.json`.
+4. **Build today's availability — convert to UTC with `scripts/to_utc.py`.** For
+   each person in `today`, run the helper to turn their `free_local` windows (in their
+   `tz`) into UTC `free_utc` — it does the DST-correct conversion, clips to their
+   `lunch_window_local`, and materializes a flexible person as their whole band, so
+   you never eyeball timezone math:
+   ```bash
+   python scripts/to_utc.py --tz <person's tz> --date <DATE> \
+     --lunch-window '{"earliest":"10:00","latest":"14:00"}' --free '<free_local JSON or null>'
+   ```
+   Store the result as `free_utc`, record the source zone as `stated_tz` (the
+   messenger's `tz`), and keep `raw` for audit. Merge with today's existing
+   availability and **carry `paired` forward**. Record the messenger's `asked` people
+   as `pending`, copy `flagged` through, and write a new `availability-<DATE>-<ts>.json`.
 5. **Surface flagged.** Note anything in `flagged` for the organizer; never act on it.
-6. **Work out timing, then choose who to pair now (just-in-time).** From
-   `config.run_schedule` (`from`–`to` every `every_min` minutes, in its `tz`) and the
-   current time, compute **when the next run will be** and whether **this is the last
-   run of the day**. Then, from today's availability, consider everyone who has an
-   email + timezone, isn't already in `paired`, and still has at least one `free_utc`
-   window that hasn't passed. Pair **now** anyone whose lunch is *due* — one of their
-   remaining windows opens at or before the next run (plus a short lead so the invite
-   arrives in time); waiting for the next run would let their lunch start. Anyone
-   whose earliest remaining window is comfortably later can **wait** — leave them in
-   availability and a later run pairs them. On the **last run of the day**, treat
-   everyone still unpaired and ready as due (no later run will catch them). If fewer
-   than two people are due, there's nothing to pair this run.
+6. **Choose who to pair now (just-in-time) with `scripts/schedule.py`.** Run the
+   helper to get, from `config.run_schedule` and the current time, the next run time,
+   whether this is the **last run**, and the **`due`** list:
+   ```bash
+   python scripts/schedule.py --now <ISO-8601 UTC now> --date <DATE> \
+     --run-schedule '<config.run_schedule JSON>' --availability ./_work/availability.json
+   ```
+   `due` is exactly the people to pair this run: opted in, matchable (email present),
+   not already in `paired`, and with a still-open window that opens at/before the next
+   run — plus everyone still ready on the last run. Everyone whose lunch is
+   comfortably later isn't in `due`; they wait, and a later run pairs them. If fewer
+   than two are due, there's nothing to pair this run.
 7. **Pair.** Aggregate the recent round files into `{"rounds":[...]}` and run the
    matcher on just that pool:
    ```bash
@@ -141,9 +145,9 @@ matched while later ones are still waking up.
     their partner name(s), the slot **in their own timezone** (convert `slot_utc` →
     their `timezone` with `zoneinfo`), and the `ts` of their message to thread under —
     a "your lunch is coming up" ping. For anyone the matcher left **unmatched this
-    run, only send a no-match heads-up if it's now hopeless**: either this is the
-    **last run of the day**, or **all of their offered windows will have passed by the
-    next run** (nothing left to try). Otherwise say nothing — they stay in
+    run**, ask `scripts/schedule.py`'s `should_notify_unmatched` whether it's hopeless
+    yet (the last run, or all their windows pass by the next run); **only send a
+    no-match heads-up if it returns true**. Otherwise say nothing — they stay in
     availability and a later run tries again, so never tell someone there's no match
     while they could still get one. The messenger writes and posts.
 

@@ -76,6 +76,13 @@ def test_partial_overlap_clipped_to_band():
     assert conv([["09:00", "11:00"]], "America/New_York", "2026-06-04") == [["14:00", "15:00"]]
 
 
+@case
+def test_single_element_window_is_open_ended():
+    # ["12:30"] (no end given) is treated as open-ended — clipped to the band end,
+    # same as ["12:30", null].
+    assert conv([["12:30"]], "America/New_York", "2026-06-04") == [["16:30", "18:00"]]
+
+
 def main():
     failed = 0
     for fn in CASES:

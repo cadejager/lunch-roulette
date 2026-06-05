@@ -57,7 +57,7 @@
           "drive": {"config": {"timezone": "America/New_York", "lunch_window_local": {"earliest": "08:00", "latest": "12:00"}, "default_lunch_duration_min": 30, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com"}, "participants": [{"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"}], "availability_today": null, "rounds": []}
         },
         "run_2": {
-          "now": "2026-06-04T14:30:00Z",
+          "now": "2026-06-04T14:00:00Z",
           "channel_messages": [{"slack_id": "U2", "text": "can I get in? free 11-11:30", "tz_note": "U2 is America/New_York"}],
           "note": "U1's later window (11-11:30 ET = 15:00-15:30 UTC) is still open; U1 was carried from run 1."
         }

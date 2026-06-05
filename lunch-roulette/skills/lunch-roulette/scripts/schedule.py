@@ -40,7 +40,10 @@ def _min(hhmm: str) -> int:
 def _parse_now(now) -> datetime:
     if isinstance(now, datetime):
         return now if now.tzinfo else now.replace(tzinfo=UTC)
-    return datetime.fromisoformat(str(now).replace("Z", "+00:00")).astimezone(UTC)
+    dt = datetime.fromisoformat(str(now).replace("Z", "+00:00"))
+    # A timezone-naive timestamp is assumed to be UTC (never the machine's local
+    # zone) — the orchestrator works in UTC and the box may be on any timezone.
+    return dt.astimezone(UTC) if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _run_datetimes_utc(run_schedule: dict, date_str: str):
@@ -52,7 +55,9 @@ def _run_datetimes_utc(run_schedule: dict, date_str: str):
     while t <= end:
         out.append(datetime(d.year, d.month, d.day, t // 60, t % 60, tzinfo=tz).astimezone(UTC))
         t += step
-    return sorted(out)
+    # set() de-dupes the rare case where a DST gap collapses two local run times
+    # onto the same UTC instant.
+    return sorted(set(out))
 
 
 def next_run_utc(now, run_schedule, date_str):
@@ -74,9 +79,15 @@ def _mins_of_day(dt, date_str) -> int:
     return int((dt.astimezone(UTC) - base).total_seconds() // 60)
 
 
+def _well_formed(w):
+    """A closed [start, end] window — defensively skip null/short ones (pair.py
+    tolerates malformed windows too; the matcher only ever gets closed UTC windows)."""
+    return bool(w) and len(w) >= 2 and w[0] is not None and w[1] is not None
+
+
 def _usable_windows(free_utc, now_min):
     """Windows not yet fully passed (end strictly after now)."""
-    return [w for w in (free_utc or []) if _min(w[1]) > now_min]
+    return [w for w in (free_utc or []) if _well_formed(w) and _min(w[1]) > now_min]
 
 
 def due_now(now, run_schedule, date_str, responses, paired=None, lead_min=0):
@@ -110,7 +121,7 @@ def should_notify_unmatched(now, run_schedule, date_str, free_utc) -> bool:
     if is_last_run(now, run_schedule, date_str):
         return True
     next_min = _mins_of_day(next_run_utc(now, run_schedule, date_str), date_str)
-    return all(_min(w[1]) <= next_min for w in (free_utc or []))
+    return all(_min(w[1]) <= next_min for w in (free_utc or []) if _well_formed(w))
 
 
 def main(argv=None):
@@ -118,7 +129,8 @@ def main(argv=None):
     ap.add_argument("--now", required=True, help="current time, ISO-8601 UTC (…Z)")
     ap.add_argument("--date", required=True, help="working date YYYY-MM-DD")
     ap.add_argument("--run-schedule", required=True, help="JSON config.run_schedule")
-    ap.add_argument("--availability", help="availability JSON (responses + paired) for --due")
+    ap.add_argument("--availability", help="availability JSON (responses + paired); adds the `due` list")
+    ap.add_argument("--unmatched-free", help="one person's free_utc JSON; adds should_notify_unmatched for them")
     args = ap.parse_args(argv)
 
     rs = json.loads(args.run_schedule)
@@ -131,6 +143,10 @@ def main(argv=None):
         with open(args.availability) as f:
             av = json.load(f)
         out["due"] = due_now(args.now, rs, args.date, av.get("responses", []), av.get("paired", []))
+    if args.unmatched_free is not None:
+        out["should_notify_unmatched"] = should_notify_unmatched(
+            args.now, rs, args.date, json.loads(args.unmatched_free)
+        )
     print(json.dumps(out, indent=2))
     return 0
 

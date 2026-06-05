@@ -113,8 +113,10 @@ matched while later ones are still waking up.
    run — plus everyone still ready on the last run. Everyone whose lunch is
    comfortably later isn't in `due`; they wait, and a later run pairs them. If fewer
    than two are due, there's nothing to pair this run.
-7. **Pair.** Aggregate the recent round files into `{"rounds":[...]}` and run the
-   matcher on just that pool:
+7. **Pair.** Write the `due` people's availability records to `./_work/pool-now.json`
+   (today's availability filtered to step 6's `due` list), aggregate the recent round
+   files into `./_work/history.json` (`{"rounds":[...]}`), and run the matcher on just
+   that pool:
    ```bash
    python scripts/pair.py --availability ./_work/pool-now.json \
      --history ./_work/history.json --config ./_work/config.json \
@@ -128,8 +130,9 @@ matched while later ones are still waking up.
      (`config.organizer_email`) with `optionalAttendee: true`** — you schedule the
      lunch, you're not eating it, so you're optional, never required.
    - **addGoogleMeetUrl: `true`** — attach a Meet so a remote pair can just hop on.
-   - **start / end**: the group's `slot_utc` on today's date as a full ISO-8601
-     **UTC** timestamp (e.g. `2026-06-04T16:00:00Z` / `...T16:30:00Z`). Google shows
+   - **start / end**: `slot_utc` is an object `{start, end}` (each `"HH:MM"` UTC) —
+     combine today's date with `slot_utc.start` / `slot_utc.end` into full ISO-8601
+     **UTC** timestamps (e.g. `2026-06-04T16:00:00Z` / `...T16:30:00Z`). Google shows
      each attendee the time in their own local zone automatically.
    - **summary**: e.g. `Lunch roulette: Alice & Bob` (or three names).
    - **description**: a warm, no-agenda note (see the templates).
@@ -142,12 +145,17 @@ matched while later ones are still waking up.
    Then add the newly matched slack_ids to availability `paired` and write a new
    availability version. Do this **after** invites go out, so a retry is safe.
 10. **Notify.** Spawn the messenger in NOTIFY. For each **matched** person, give
-    their partner name(s), the slot **in their own timezone** (convert `slot_utc` →
-    their `timezone` with `zoneinfo`), and the `ts` of their message to thread under —
-    a "your lunch is coming up" ping. For anyone the matcher left **unmatched this
-    run**, ask `scripts/schedule.py`'s `should_notify_unmatched` whether it's hopeless
-    yet (the last run, or all their windows pass by the next run); **only send a
-    no-match heads-up if it returns true**. Otherwise say nothing — they stay in
+    their partner name(s), the slot **in their own timezone** (convert
+    `slot_utc.start` → their `timezone` with `zoneinfo`), and the `ts` of their
+    message to thread under — a "your lunch is coming up" ping. For anyone the matcher
+    left **unmatched this run**, check whether it's hopeless yet with
+    `scripts/schedule.py`, passing that person's windows:
+    ```bash
+    python scripts/schedule.py --now <ISO-8601 UTC now> --date <DATE> \
+      --run-schedule '<config.run_schedule JSON>' --unmatched-free '<their free_utc JSON>'
+    ```
+    **Only send a no-match heads-up if `should_notify_unmatched` is true** (the last
+    run, or all their windows pass by the next run). Otherwise say nothing — they stay in
     availability and a later run tries again, so never tell someone there's no match
     while they could still get one. The messenger writes and posts.
 

@@ -61,6 +61,16 @@ When changing behavior, update the script **and** its test **and** the matching 
 
 **5. Just-in-time hourly pairing.** A scheduled run fires hourly across the team's morning (`config.run_schedule`). Every run does the *same* job — sync the channel, then pair only the people whose lunch is "due" before the **next** run; everyone else waits for a later run. Someone is told "no match" only when it's hopeless (the last run, or all their windows pass by the next run). There is **no separate collect/pair phase**. The two entry points (`commands/lunch.md`) are `/lunch setup` (first-time) and `/lunch run` / blank (the hourly job).
 
+## Runtime notes (not visible from the source)
+
+Hard-won context from running this in Cowork — you can't infer these from the files:
+
+- **Scheduled Cowork sessions are ephemeral** — the local filesystem does not survive between runs, which is *why* state lives in Drive (append-only). Treat `./_work/` as throwaway scratch.
+- **Cron fires in the host machine's local timezone, with ~10 min jitter** — not a per-task configurable zone. Offset the schedule from the host zone to the team's, and don't expect to-the-minute starts (see `references/scheduling.md`).
+- **Slack profiles usually expose email + timezone**, so onboarding *reads* them and only asks in-channel when one is genuinely hidden. (Day one produced zero lunches because the deployed bot asked instead of reading — don't regress that.)
+- **The `lunch-messenger` Slack connector UUID is hardcoded** in its `tools:` allowlist and is workspace-specific; installing in another workspace means swapping it, or the messenger fails closed (the safe direction).
+- **You can't run the whole plugin locally** — it needs the Cowork runtime plus the Slack/Calendar/Drive connectors. Locally you get the Python core (`scripts/test_*.py`) and the dry-run evals; real behavior is exercised in Cowork.
+
 ## Keeping things consistent
 
 The messenger↔orchestrator data contract lives in three files that must agree: `agents/lunch-messenger.md` (what the messenger returns), `references/data-schemas.md` (the contract + stored shapes), and `SKILL.md` (how the orchestrator consumes and writes it). The `skills/lunch-roulette/evals/` definitions encode expected behavior against that same contract. A change to a field name or a run step usually touches all four — keep them in lockstep.

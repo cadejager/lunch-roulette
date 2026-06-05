@@ -4,3 +4,19 @@ __pycache__/
 
 # Build artifacts (the plugin zip is generated from the source tree)
 *.zip
+
+# Local scratch / working dirs — never committed.
+# Convention: any directory whose name starts with "_" is local-only scratch, at
+# any depth. The skill uses _work/ for its per-run download -> compute -> upload
+# cycle; _dryrun/ is handy for local test data.
+_*/
+
+# Python environments & tool caches (if used locally)
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS cruft
+.DS_Store

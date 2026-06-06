@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Just-in-time scheduling decisions for the hourly lunch runs — kept here, in
 tested code, rather than left to the orchestrator's in-the-moment arithmetic.
 

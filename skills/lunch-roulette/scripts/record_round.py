@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Write an **append-only** lunch round file.
 
 Drive can't overwrite or delete, so history is kept as one immutable file per

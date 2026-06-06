@@ -103,6 +103,16 @@ def test_empty_element_is_skipped():
 
 
 @case
+def test_scalar_element_is_dropped():
+    # A window ELEMENT that is a bare scalar (e.g. 123) rather than a [start, end]
+    # pair must be dropped like other malformed windows, not crash on w[0]. A good
+    # neighbour window survives (degrade-don't-crash contract).
+    assert conv([123], "America/New_York", "2026-06-04") == []
+    assert conv([1.5], "America/New_York", "2026-06-04") == []
+    assert conv([123, ["11:00", "13:00"]], "America/New_York", "2026-06-04") == [["15:00", "17:00"]]
+
+
+@case
 def test_unparseable_time_skips_only_that_window():
     # Times an LLM might emit from messy text — no colon, words, out-of-range — drop
     # just their own window, leaving the rest of the person's availability intact.

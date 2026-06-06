@@ -148,6 +148,29 @@ def test_parse_free_utc_tolerates_malformed():
 
 
 @case
+def test_parse_free_utc_drops_scalar_elements():
+    # A window ELEMENT that is a bare scalar (not a list) — e.g. a number or bool an
+    # LLM/JSON quirk slipped in — must be dropped, not crash on len()/subscript. The
+    # good neighbour window survives (degrade-don't-crash contract).
+    assert pair.parse_free_utc([123]) == []
+    assert pair.parse_free_utc([1.5]) == []
+    assert pair.parse_free_utc([True]) == []
+    assert pair.parse_free_utc([123, ["16:00", "17:00"]]) == [[960, 1020]]
+
+
+@case
+def test_parse_hhmm_rejects_out_of_range():
+    # _parse_hhmm range-checks like to_utc._local_dt, so an out-of-range value drops
+    # to None instead of becoming a junk interval. Valid times still parse.
+    assert pair._parse_hhmm("25:99") is None
+    assert pair._parse_hhmm("-1:00") is None
+    assert pair._parse_hhmm("0:99") is None
+    assert pair._parse_hhmm("13:30") == 810
+    assert pair._parse_hhmm("00:00") == 0
+    assert pair._parse_hhmm("23:59") == 1439
+
+
+@case
 def test_merge_intervals_coalesces_overlap_and_adjacent():
     # Overlapping AND touching pieces merge; a real gap stays split.
     assert pair.merge_intervals([[960, 980], [980, 1000], [1010, 1020]]) == [[960, 1000], [1010, 1020]]

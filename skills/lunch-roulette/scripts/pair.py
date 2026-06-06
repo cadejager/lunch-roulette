@@ -109,16 +109,22 @@ def earliest_slot(intervals: list[list[int]], duration: int) -> list[int] | None
 
 # --- Loading & normalization ---------------------------------------------
 def _parse_hhmm(value) -> int | None:
-    """Best-effort ``"HH:MM"`` -> minutes; None if not a well-formed clock time."""
+    """Best-effort ``"HH:MM"`` -> minutes; None if not a well-formed in-range clock
+    time. Range-checked (0-23h, 0-59m) for symmetry with to_utc._local_dt, so an
+    out-of-range value like '25:99' is dropped rather than turned into a junk
+    interval."""
     if not isinstance(value, str):
         return None
-    s = value.strip()
-    if not s:
+    parts = value.strip().split(":")
+    if len(parts) != 2:
         return None
     try:
-        return to_minutes(s)
-    except (ValueError, AttributeError):
+        h, m = int(parts[0]), int(parts[1])
+    except ValueError:
         return None
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return None
+    return h * 60 + m
 
 
 def parse_free_utc(free_utc: list | None) -> list[list[int]]:
@@ -131,7 +137,7 @@ def parse_free_utc(free_utc: list | None) -> list[list[int]]:
     contract, since these inputs trace back to messy human messages)."""
     out: list[list[int]] = []
     for item in free_utc or []:
-        if not item or len(item) < 2:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
             continue
         s, e = _parse_hhmm(item[0]), _parse_hhmm(item[1])
         if s is None or e is None:

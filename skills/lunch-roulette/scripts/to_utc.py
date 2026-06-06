@@ -97,6 +97,9 @@ def to_free_utc(free_local, tz_name: str, date_str: str, lunch_window_local: dic
         for w in free_local:
             if not w:  # empty/None element inside the list -> nothing stated, skip
                 continue
+            if not isinstance(w, (list, tuple)):  # a scalar (e.g. 123) -> malformed, drop
+                print(f"to_utc: dropping window {w!r}: not a [start, end] pair", file=sys.stderr)
+                continue
             try:
                 # null/missing start -> band start; null/missing end -> band end.
                 start = band_lo if w[0] is None else _local_dt(d, w[0], tz).astimezone(UTC)

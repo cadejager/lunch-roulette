@@ -96,6 +96,42 @@
       ]
     },
     {
+      "id": "orch-last-run-notifies-unmatched",
+      "name": "last run: matched pair AND the leftover are all notified",
+      "intent": "On the last run, an opted-in person the matcher couldn't place is given a kind 'no match' heads-up via the messenger NOTIFY — they are not silently dropped; the matched pair still get their match notification; the decision uses scripts/schedule.py.",
+      "setup": {
+        "now": "2026-06-04T16:00:00Z",
+        "drive": {
+          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com"},
+          "participants": [
+            {"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"},
+            {"slack_id": "U2", "email": "b@org.com", "timezone": "America/New_York"},
+            {"slack_id": "U3", "email": "c@org.com", "timezone": "America/New_York"}
+          ],
+          "availability_today": {
+            "date": "2026-06-04",
+            "responses": [
+              {"slack_id": "U1", "email": "a@org.com", "free_utc": [["16:00", "16:45"]]},
+              {"slack_id": "U2", "email": "b@org.com", "free_utc": [["16:00", "16:45"]]},
+              {"slack_id": "U3", "email": "c@org.com", "free_utc": [["16:50", "17:30"]]}
+            ],
+            "paired": []
+          },
+          "rounds": []
+        },
+        "sync_return": {"roster": "unchanged", "today": [], "asked": [], "flagged": []}
+      },
+      "prompt": "Run this run (dry-run). It is the last scheduled run of the day. Show the due pool, the groups, the invites, and every NOTIFY instruction (matched and unmatched).",
+      "assertions": [
+        "The due pool (from scripts/schedule.py) is U1, U2, and U3 — it's the last run, so everyone still active is swept (is_last_run = true)",
+        "The matcher pairs U1 & U2 (their 16:00–16:45 windows overlap by ≥30 min); U3 is left unmatched — its 16:50–17:30 window overlaps no one's by ≥30 min",
+        "U1 & U2 get a calendar invite + an 'upcoming lunch' NOTIFY",
+        "Because it's the last run, should_notify_unmatched is true for U3, so the orchestrator hands U3 to the messenger NOTIFY for a kind 'couldn't line one up today' heads-up — U3 is NOT silently dropped",
+        "The no-match decision is made with scripts/schedule.py, not ad hoc",
+        "The single NOTIFY dispatch covers BOTH the matched pair (U1 & U2) and the unmatched person (U3)"
+      ]
+    },
+    {
       "id": "orch-invite-shape",
       "name": "calendar invite: Meet + bot optional + UTC + emails",
       "intent": "Every create_event has the right shape: real attendees required, the bot optional, a Meet attached, UTC times.",

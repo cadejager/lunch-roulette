@@ -57,13 +57,14 @@ bulk-delete stale versions in the Drive UI whenever they like.
   "novelty_window_days": 14,
   "organizer_email": "you@org.com",
   "calendar_id": "primary",
-  "run_schedule": { "tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60 }
+  "run_schedule": { "tz": "America/New_York", "from": "07:40", "to": "11:40", "every_min": 60 }
 }
 ```
 
-- **timezone** — the team's *working-day* zone. It is **not** a "reference zone"
-  for matching anymore (everything matches in UTC); it only anchors which calendar
-  date "today" is and provides a fallback if a person's own timezone is somehow
+- **timezone** — the **host's** IANA zone (the machine that fires the scheduled
+  task), detected at setup. The team has no single zone, so this is **not** a "team
+  zone" and **not** a matching axis (everything matches in UTC); it only anchors
+  which calendar date "today" is and is the fallback when a person's own timezone is
   unknown.
 - **lunch_window_local** — the daily band, **in each person's own local clock**,
   that lunch may be scheduled within. The orchestrator converts this band into UTC
@@ -76,11 +77,16 @@ bulk-delete stale versions in the Drive UI whenever they like.
   recent shared lunches weigh more.
 - **max_group_size** — keep at 3; the matcher only makes a three when the count is
   odd.
-- **run_schedule** — when the daily runs fire (see references/scheduling.md). The
-  cron is set to match this; `scripts/schedule.py` exposes a `within_active_window`
-  signal so the orchestrator skips (no-ops) a stale fire that lands outside the active
-  window — e.g. cron drift or an over-broad cron — instead of treating it as the last
-  run. See references/scheduling.md.
+- **run_schedule** — when the daily runs fire (see references/scheduling.md).
+  `tz` is the **host zone** — the same value as `timezone` — so the just-in-time
+  logic and the cron agree by construction. The default is hourly across the host's
+  morning, `{"tz": <host zone>, "from": "07:40", "to": "11:40", "every_min": 60}`,
+  and is configurable at setup. The cron is set at the matching host-local times with
+  **no offset** (e.g. `40 7-11 * * 1-5`), since Cowork's cron fires in host-local
+  time. `scripts/schedule.py` exposes a `within_active_window` signal so the
+  orchestrator skips (no-ops) a stale fire that lands outside the active window —
+  e.g. cron jitter or an over-broad cron — instead of treating it as the last run.
+  See references/scheduling.md.
 
 ## participants.json (the roster)
 

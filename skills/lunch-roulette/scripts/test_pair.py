@@ -3,7 +3,10 @@
 
 Everything is in UTC "HH:MM"; the orchestrator does all timezone work upstream,
 so these exercise pure interval overlap, odd counts, novelty rotation, the
-duration floor, multi-window people, and the can't-match edge cases. No deps.
+duration floor, multi-window people, and the can't-match edge cases. Also the
+input-robustness contract: parse_free_utc tolerating malformed windows and
+adjacent/contiguous windows merging so a split-but-continuous span still matches.
+No deps.
 """
 
 import pair
@@ -130,6 +133,80 @@ def test_deterministic_same_day():
     a = pair.compute(avail("2026-06-04", people), {"rounds": []}, {}, {})
     b = pair.compute(avail("2026-06-04", people), {"rounds": []}, {}, {})
     assert a == b, (a, b)
+
+
+@case
+def test_parse_free_utc_tolerates_malformed():
+    # parse_free_utc promises to drop anything not a well-formed closed pair instead
+    # of crashing: single-element, empty/whitespace endpoint, non-numeric.
+    assert pair.parse_free_utc([["16:00"], ["", "16:30"], ["16:00", "17:00"]]) == [[960, 1020]]
+    assert pair.parse_free_utc(
+        [None, ["16:00"], ["16:00", ""], ["  ", "16:30"], ["ab", "cd"], ["16:00", "17:00"]]
+    ) == [[960, 1020]]
+    assert pair.parse_free_utc(None) == []
+    assert pair.parse_free_utc([]) == []
+
+
+@case
+def test_parse_free_utc_drops_scalar_elements():
+    # A window ELEMENT that is a bare scalar (not a list) — e.g. a number or bool an
+    # LLM/JSON quirk slipped in — must be dropped, not crash on len()/subscript. The
+    # good neighbour window survives (degrade-don't-crash contract).
+    assert pair.parse_free_utc([123]) == []
+    assert pair.parse_free_utc([1.5]) == []
+    assert pair.parse_free_utc([True]) == []
+    assert pair.parse_free_utc([123, ["16:00", "17:00"]]) == [[960, 1020]]
+
+
+@case
+def test_parse_hhmm_rejects_out_of_range():
+    # _parse_hhmm range-checks like to_utc._local_dt, so an out-of-range value drops
+    # to None instead of becoming a junk interval. Valid times still parse.
+    assert pair._parse_hhmm("25:99") is None
+    assert pair._parse_hhmm("-1:00") is None
+    assert pair._parse_hhmm("0:99") is None
+    assert pair._parse_hhmm("13:30") == 810
+    assert pair._parse_hhmm("00:00") == 0
+    assert pair._parse_hhmm("23:59") == 1439
+
+
+@case
+def test_merge_intervals_coalesces_overlap_and_adjacent():
+    # Overlapping AND touching pieces merge; a real gap stays split.
+    assert pair.merge_intervals([[960, 980], [980, 1000], [1010, 1020]]) == [[960, 1000], [1010, 1020]]
+    assert pair.merge_intervals([[960, 1000], [970, 990]]) == [[960, 1000]]  # nested
+    assert pair.merge_intervals([]) == []
+
+
+@case
+def test_adjacent_windows_merge_to_match():
+    # Two people each free 16:00-16:20 and 16:20-16:40 form a continuous 40-min span;
+    # merged it clears the 30-min floor, so they MUST match (previously unmatched).
+    res = pair.compute(
+        avail("2026-06-04", [
+            ("a@x", [["16:00", "16:20"], ["16:20", "16:40"]]),
+            ("b@x", [["16:00", "16:20"], ["16:20", "16:40"]]),
+        ]),
+        {"rounds": []}, {}, {},
+    )
+    assert groups_as_sets(res) == [frozenset({"a@x", "b@x"})], res
+    assert not res["unmatched"], res
+    assert res["groups"][0]["slot_utc"] == {"start": "16:00", "end": "16:30"}, res["groups"][0]
+
+
+@case
+def test_malformed_windows_dont_crash_compute():
+    # Malformed windows inside a response are dropped, not fatal; a good neighbour
+    # window keeps the person matchable.
+    res = pair.compute(
+        avail("2026-06-04", [
+            ("a@x", [["16:00"], ["", "16:30"], ["16:00", "17:00"]]),
+            ("b@x", [["16:00", "17:00"]]),
+        ]),
+        {"rounds": []}, {}, {},
+    )
+    assert groups_as_sets(res) == [frozenset({"a@x", "b@x"})], res
+    assert not res["unmatched"], res
 
 
 @case

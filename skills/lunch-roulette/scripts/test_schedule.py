@@ -145,6 +145,47 @@ def test_tolerates_malformed_windows():
     schedule.should_notify_unmatched("2026-06-04T12:00:00Z", RS, DATE, [["12:30", None]])
 
 
+# --- robustness regressions ----------------------------------------------
+@case
+def test_negative_every_min_does_not_crash():
+    # A non-positive every_min must fall back to the hourly default rather than
+    # marching `t` out of range and crashing datetime() (ValueError: hour 0..23).
+    bad = {"tz": "UTC", "from": "08:00", "to": "12:00", "every_min": -30}
+    runs = schedule._run_datetimes_utc(bad, DATE)
+    assert [r.strftime("%H:%M") for r in runs] == ["08:00", "09:00", "10:00", "11:00", "12:00"], runs
+    # zero also rescues to hourly (unchanged from before)
+    zero = {"tz": "UTC", "from": "08:00", "to": "12:00", "every_min": 0}
+    assert len(schedule._run_datetimes_utc(zero, DATE)) == 5
+
+
+@case
+def test_no_match_quiet_when_no_windows_on_non_last_run():
+    # Empty / all-malformed free_utc is NOT evidence that their windows have passed,
+    # so on a NON-last run we must stay quiet (all([]) must not read as "hopeless").
+    assert schedule.should_notify_unmatched("2026-06-04T12:00:00Z", RS, DATE, []) is False
+    assert schedule.should_notify_unmatched("2026-06-04T12:00:00Z", RS, DATE, None) is False
+    assert schedule.should_notify_unmatched("2026-06-04T12:00:00Z", RS, DATE, [["12:30", None], [None, None]]) is False
+    # …but the last run still finalizes unconditionally, even with no windows.
+    assert schedule.should_notify_unmatched("2026-06-04T16:00:00Z", RS, DATE, []) is True
+    assert schedule.should_notify_unmatched("2026-06-04T16:00:00Z", RS, DATE, [["12:30", None]]) is True
+
+
+@case
+def test_within_active_window_detects_stale_fires():
+    # Runs are 12:00..16:00 UTC; grace 15m -> active window [11:45, 16:15].
+    # In-window run: True.
+    assert schedule.is_within_active_window("2026-06-04T13:00:00Z", RS, DATE) is True
+    # Slightly-late last fire (within grace): still in-window despite is_last_run.
+    assert schedule.is_within_active_window("2026-06-04T16:10:00Z", RS, DATE) is True
+    assert schedule.is_last_run("2026-06-04T16:10:00Z", RS, DATE) is True
+    # An extra fire well past last_run + grace: NOT in-window (orchestrator no-ops it),
+    # even though is_last_run still (correctly, unchanged) reports True.
+    assert schedule.is_within_active_window("2026-06-04T16:30:00Z", RS, DATE) is False
+    assert schedule.is_last_run("2026-06-04T16:30:00Z", RS, DATE) is True
+    # A stray fire well before first_run - grace: also out of window.
+    assert schedule.is_within_active_window("2026-06-04T11:00:00Z", RS, DATE) is False
+
+
 def main():
     failed = 0
     for fn in CASES:

@@ -19,8 +19,19 @@ team's `timezone`** (e.g. ET):
 ```
 
 Widen `to` (and/or set `tz` thinking) at setup if the team reaches far-west zones.
-Each run also **no-ops if it fires outside the active window**, so an over-broad cron
-is harmless.
+
+**Match the cron to the schedule** — don't leave it over-broad. A fire that lands
+*after* the last scheduled run (e.g. a stray extra hour on the cron, or jitter that
+pushes a fire well past `to`) is NOT a harmless no-op by accident: `is_last_run` is
+True for *any* time at/after the last fire, so an unchecked late fire would be treated
+as "the last run" and would sweep + finalize "no match" for people whose lunch is
+still hours away. `schedule.py` exposes the signal to guard against this:
+`within_active_window` is True only when the fire falls inside
+`[first_run − grace, last_run + grace]` (grace ≈ 15 min). The orchestrator should
+read it at the top of a run and **no-op** when it is False — not re-pairing anyone or
+finalizing any "no match", and waiting for the next legitimate fire. With that guard
+in place an over-broad cron is *tolerated* (the extra fires are dropped), but it is
+still wasted work; size the cron to the window.
 
 ## Cowork runtime caveats (important)
 
@@ -28,10 +39,13 @@ is harmless.
   the computer running the session is on. Write the cron relative to *that* zone and
   offset from the team zone yourself. Example: team on ET, machine on Mountain →
   08:00–12:00 ET is **06:00–10:00 MT**, so `0 6-10 * * 1-5`.
-- **Firing drifts by up to ~10 minutes** (dispatch jitter). The hourly cadence and
-  the just-in-time pairing (which only matches people whose lunch is still an hour+
-  out) absorb this comfortably, and invites land at the right local time regardless
-  because all the math is in UTC.
+- **Firing drifts by up to ~10 minutes** (dispatch jitter). Jitter *within* the
+  window is absorbed comfortably by the hourly cadence and the just-in-time pairing
+  (which only matches people whose lunch is still an hour+ out), and invites land at
+  the right local time regardless because all the math is in UTC. For the **last**
+  fire specifically, the `within_active_window` grace (≈ 15 min, above) covers a
+  slightly-late dispatch so it still counts as the in-window last run rather than a
+  dropped stale fire.
 
 ## Setting it up in Cowork
 

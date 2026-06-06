@@ -66,7 +66,6 @@ just misunderstood:
 
 - Always attach a Google Meet (`addGoogleMeetUrl: true`) and add the bot
   (`organizer_email`) as an **optional** attendee.
-- After creating the event, the orchestrator should **read it back** to confirm the
-  Meet link is actually attached and the organizer landed as an **optional** (not
-  required) attendee — so a malformed event (no Meet, or the organizer accidentally
-  required) is caught rather than shipped.
+- `create_event` returns the created event, so confirm from **that response** that the
+  Meet link is attached and the organizer landed as `optionalAttendee: true` (not
+  required) — catching a malformed event rather than shipping it. No second read-back.

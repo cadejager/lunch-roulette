@@ -25,13 +25,13 @@ Widen `to` (and/or set `tz` thinking) at setup if the team reaches far-west zone
 pushes a fire well past `to`) is NOT a harmless no-op by accident: `is_last_run` is
 True for *any* time at/after the last fire, so an unchecked late fire would be treated
 as "the last run" and would sweep + finalize "no match" for people whose lunch is
-still hours away. The orchestrator guards against this with the
-`within_active_window` signal from `schedule.py`: a fire is in-window only when it
-falls inside `[first_run − grace, last_run + grace]` (grace ≈ 15 min). When that's
-False, the orchestrator **no-ops the run** — it does **not** re-pair anyone or finalize
-any "no match" — and waits for the next legitimate fire. So an over-broad cron is
-*tolerated* (the extra fires are dropped), but it is wasted work; size the cron to the
-window.
+still hours away. `schedule.py` exposes the signal to guard against this:
+`within_active_window` is True only when the fire falls inside
+`[first_run − grace, last_run + grace]` (grace ≈ 15 min). The orchestrator should
+read it at the top of a run and **no-op** when it is False — not re-pairing anyone or
+finalizing any "no match", and waiting for the next legitimate fire. With that guard
+in place an over-broad cron is *tolerated* (the extra fires are dropped), but it is
+still wasted work; size the cron to the window.
 
 ## Cowork runtime caveats (important)
 

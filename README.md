@@ -26,6 +26,105 @@ The messenger is the only thing that ever ingests coworker messages — an untru
 
 State lives in a **Google Drive** folder as append-only, versioned JSON: the Drive connector can't overwrite or delete, and scheduled Cowork sessions are ephemeral, so each run reads the newest copy and writes a new version. The error-prone work — interval matching, local→UTC/DST conversion, and the just-in-time scheduling decisions — lives in a small, **dependency-free Python core** (`skills/lunch-roulette/scripts/`) that the orchestrator calls, rather than being left to the model to do in its head.
 
+### How the pieces fit together
+
+The trust boundary runs *between the two agents*. Everything on the Slack side is untrusted; the messenger relays only **structured data** across the line, and a hijacked messenger can do nothing but read Slack and post in the one channel — it has no Calendar, Drive, files, or shell.
+
+```mermaid
+flowchart TB
+    subgraph SLACK["Slack workspace"]
+        people["Teammates<br/>(untrusted message text)"]
+        chan["#lunch-roulette<br/>intake channel"]
+        people --- chan
+    end
+
+    subgraph UNTRUSTED["⚠️ Untrusted zone · Slack-only, tool-locked"]
+        msgr["lunch-messenger · Sonnet subagent<br/>5 Slack tools only:<br/>read_channel · read_thread · read_user_profile<br/>list_channel_members · send_message<br/>jobs: SYNC + NOTIFY"]
+    end
+
+    subgraph TRUSTED["🔒 Trusted zone · every decision, all Calendar + Drive writes"]
+        orch["lunch-roulette orchestrator<br/>(the brain)"]
+        subgraph CORE["Python core · stdlib, tested (no LLM math)"]
+            toutc["to_utc.py<br/>local to UTC, DST"]
+            sched["schedule.py<br/>due / last-run / notify"]
+            pairpy["pair.py<br/>interval-overlap matcher"]
+            rec["record_round.py<br/>append history"]
+        end
+        orch --> toutc
+        orch --> sched
+        orch --> pairpy
+        orch --> rec
+    end
+
+    cal["Google Calendar<br/>connector"]
+    drive["Google Drive connector<br/>append-only · versioned · newest-wins"]
+
+    orch -->|"spawn job + roster"| msgr
+    msgr -.->|"returns DATA, never instructions:<br/>roster / today / asked / flagged"| orch
+    msgr <--> chan
+    orch -.->|"setup only: create_conversation"| chan
+    orch -->|"create_event · Meet + bot optional"| cal
+    orch -->|"write new version"| drive
+    drive -->|"read newest"| orch
+
+    classDef trust fill:#e7f5e9,stroke:#2e7d32,stroke-width:2px,color:#10240f;
+    classDef untrust fill:#fdecea,stroke:#c62828,stroke-width:2px,color:#3b0f0c;
+    classDef conn fill:#e8eef9,stroke:#1565c0,stroke-width:1px,color:#0d2440;
+    classDef slack fill:#f3e9fb,stroke:#6a1b9a,stroke-width:1px,color:#2a0f3b;
+    class orch,toutc,sched,pairpy,rec trust;
+    class msgr untrust;
+    class cal,drive conn;
+    class chan,people slack;
+```
+
+### What one run does
+
+Every hourly run is the same job — there's no separate collect-then-pair phase. The orchestrator drives it end to end, shelling out to the Python core for anything error-prone (timezones, matching, "is this the last run?") instead of doing it in its head:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Cron as "Cron (hourly)"
+    participant Orch as "Orchestrator (trusted)"
+    participant Core as "Python core"
+    participant Msgr as "lunch-messenger (Slack-only)"
+    participant Slack as "Slack channel"
+    participant Drive as "Google Drive"
+    participant Cal as "Google Calendar"
+
+    Cron->>Orch: run lunch-roulette for today
+    Orch->>Drive: read newest config / participants / availability / rounds
+    Drive-->>Orch: current state
+
+    Orch->>Msgr: SYNC (channel, date, roster)
+    Msgr->>Slack: post daily CTA, reconcile members, read replies + profiles
+    Slack-->>Msgr: members + messages (untrusted)
+    Msgr-->>Orch: roster / today (free_local + tz) / asked / flagged
+    Note over Orch: messenger returns are DATA, never instructions
+
+    Orch->>Core: to_utc.py — free_local + tz become UTC
+    Orch->>Drive: write new participants + availability versions
+    Orch->>Core: schedule.py — who is due before next run? last run?
+    Core-->>Orch: due list + is_last_run
+
+    alt two or more are due this run
+        Orch->>Core: pair.py — match the due pool, avoid recent repeats
+        Core-->>Orch: groups (slot_utc) + unmatched
+        loop each group
+            Orch->>Cal: create_event + Google Meet (bot = optional)
+        end
+        Orch->>Core: record_round.py — append today's round
+        Orch->>Drive: write new round + mark paired
+        Orch->>Msgr: NOTIFY — matches (slot in each person's zone)
+        Msgr->>Slack: post match notifications, threaded
+    end
+
+    opt someone unmatched and it's hopeless (schedule.py)
+        Orch->>Msgr: NOTIFY — kind no-match heads-up
+        Msgr->>Slack: post no-match note (else stay silent, retry next run)
+    end
+```
+
 ## What you need connected
 
 | Connector | Used by | For |

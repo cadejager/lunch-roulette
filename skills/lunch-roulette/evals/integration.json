@@ -43,7 +43,7 @@
         "Bob's 'any time' is materialized as his full local lunch band in UTC (not left null in the matcher)",
         "All availability is stored in UTC with each person's stated_tz preserved",
         "At 15:00Z, only people whose lunch is due now are paired (schedule.py); the rest wait — and matched pairs get an invite (Meet attached, bot optional) plus an in-channel 'upcoming lunch' notification",
-        "Nina is added to the roster only once she supplies an email (so not in this run's participants update beyond pending), and the bot/self is never a participant"
+        "Nina (U7, email hidden) IS added to the roster from channel membership with email null (the roster mirrors membership); she is not matchable or paired this run and is recorded as pending; and the bot/self (U0BOT) is never on the roster"
       ]
     },
     {

@@ -1,24 +1,35 @@
 # Scheduling the daily runs (Claude Cowork)
 
-The orchestrator fires **hourly across the team's morning**. Each run is the same
-job — sync the channel, then pair anyone whose lunch is imminent (see SKILL.md →
-"The daily run"). There is no separate collect/pair phase anymore; pairing happens
-just in time, so early timezones get matched while later ones are still waking up.
+The orchestrator fires **hourly across the morning**. Each run is the same job —
+sync the channel, then pair anyone whose lunch is imminent (see SKILL.md → "The
+daily run"). There is no separate collect/pair phase anymore; pairing happens just
+in time, so early timezones get matched while later ones are still waking up.
+
+## The host timezone anchors everything
+
+The team has **no single timezone**, so we don't try to track a "team zone." Instead
+everything is anchored to the **host** — the machine that fires the scheduled task:
+
+- `config.timezone` is the **host's** IANA zone. It decides which calendar day
+  "today" is and is the per-person fallback when someone's own zone is unknown.
+- `config.run_schedule.tz` is the **host zone too**, so `schedule.py`'s just-in-time
+  logic and the cron agree **by construction** — no offset to guess, no drift.
+
+Setup detects the host zone and writes it to both fields (see SKILL.md → "First-time
+setup").
 
 ## When it should run
 
-The ideal window is **8:00 in the earliest participant's timezone through ~noon in
-the latest participant's timezone**, every hour. For a team spanning US Eastern and
-Pacific that's 8:00 ET → 12:00 PT, i.e. five-ish hourly fires.
-
-For simplicity, the default `config.run_schedule` is **hourly, 08:00–12:00 in the
-team's `timezone`** (e.g. ET):
+The default `config.run_schedule` is **hourly, 07:40–11:40 in the host zone**:
 
 ```json
-"run_schedule": { "tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60 }
+"run_schedule": { "tz": "<host zone>", "from": "07:40", "to": "11:40", "every_min": 60 }
 ```
 
-Widen `to` (and/or set `tz` thinking) at setup if the team reaches far-west zones.
+That's five fires — 07:40 / 08:40 / 09:40 / 10:40 / 11:40 host-local — covering a
+normal working morning. It's **configurable at setup**: widen `from`/`to` (or change
+`every_min`) if the team spreads across far-apart zones and you want the window to
+reach earlier risers or later coasts.
 
 **Match the cron to the schedule** — don't leave it over-broad. A fire that lands
 *after* the last scheduled run (e.g. a stray extra hour on the cron, or jitter that
@@ -35,10 +46,12 @@ still wasted work; size the cron to the window.
 
 ## Cowork runtime caveats (important)
 
-- **Cron fires in the machine's local timezone**, not a per-task one — whatever zone
-  the computer running the session is on. Write the cron relative to *that* zone and
-  offset from the team zone yourself. Example: team on ET, machine on Mountain →
-  08:00–12:00 ET is **06:00–10:00 MT**, so `0 6-10 * * 1-5`.
+- **Cron fires in the host machine's local timezone**, not a per-task one. Because
+  `run_schedule.tz` *is* the host zone, the cron times **equal the `run_schedule`
+  times directly — no offset math.** For the 07:40–11:40 default the cron is simply
+  `40 7-11 * * 1-5`. (This removes the old silent-failure risk where the schedule
+  was on a "team zone" and someone had to hand-offset the cron to the host zone and
+  could quietly get it wrong.)
 - **Firing drifts by up to ~10 minutes** (dispatch jitter). Jitter *within* the
   window is absorbed comfortably by the hourly cadence and the just-in-time pairing
   (which only matches people whose lunch is still an hour+ out), and invites land at
@@ -49,14 +62,19 @@ still wasted work; size the cron to the window.
 
 ## Setting it up in Cowork
 
-Create **one recurring scheduled task** that fires hourly across the active window,
-with the prompt:
+Create **one recurring scheduled task**, at the host-local times matching
+`run_schedule` (the default `40 7-11 * * 1-5`), with the **minimal** prompt:
 
 > `Run the lunch-roulette skill for today.`
 
-(No phase argument — every run is the same job.) Make sure the scheduled session has
-the **Slack, Google Calendar, and Google Drive** connectors available: the
-orchestrator needs Calendar + Drive, and the `lunch-messenger` it spawns needs Slack.
+(No phase argument, and **no inlined config** — every run is the same job, and the
+orchestrator reads the newest config from Drive at run time, so the channel,
+timezone, window, organizer, and schedule all live in one place and can't drift.)
+Create this task **only after the plugin install is confirmed** — a schedule made
+before the plugin is registered fires background sessions with no skill/messenger and
+can't pair. Make sure the scheduled session has the **Slack, Google Calendar, and
+Google Drive** connectors available: the orchestrator needs Calendar + Drive, and the
+`lunch-messenger` it spawns needs Slack.
 
 ## Running more than one team at once
 

@@ -103,8 +103,9 @@ There is no separate "collect" vs "pair" phase. Each run does the same thing, an
 pairing happens **just in time** for each person's lunch, so early timezones get
 matched while later ones are still waking up.
 
-1. **Today & state.** Compute today's date in `config.timezone`. Read the newest
-   config, participants, today's availability, and recent round files from Drive.
+1. **Today & state.** Compute today's date in `config.timezone` (the host zone — the
+   working-day anchor). Read the newest config, participants, today's availability, and
+   recent round files from Drive.
    **Guard the config first:** if `config.channel_id` is empty or missing, STOP and
    tell the organizer to finish setup — never spawn the messenger against a blank
    channel. This run may also be a **stale / out-of-window fire** (cron jitter or a
@@ -238,21 +239,54 @@ Confirm each side-effect before doing it — you're creating real shared resourc
 2. **Create the intake channel.** With the host's go-ahead, create it yourself with
    `slack_create_conversation` (your one direct Slack call), or point at an existing
    channel. Record its id as `config.channel_id` and name as `config.channel_name`.
-   **Assert `config.channel_id` is actually a non-empty id** after creating/selecting
-   it (the example config seeds it blank) — a blank channel id means the daily run will
-   refuse to start (step 1).
+   **If `slack_create_conversation` returns `name_taken`, STOP and re-confirm with
+   the host** — reuse that existing channel, or pick a different name? Don't silently
+   adopt a channel the host didn't choose. **Assert `config.channel_id` is actually a
+   non-empty id** after creating/selecting it (the example config seeds it blank) — a
+   blank channel id means the daily run will refuse to start (step 1).
 3. **Confirm the Drive folder** (`config.drive_folder`, default `lunch-roulette`)
    and create it.
-4. **Capture host-only values** — `timezone` (the team's working-day zone),
-   `organizer_email` and `calendar_id` (the account that owns the invites), and the
-   lunch window / run schedule if not the defaults. Seed `config.json` from
-   `assets/config.example.json`.
+4. **Capture host-only values.** Seed `config.json` from
+   `assets/config.example.json`, then set:
+   - **`timezone` + `run_schedule.tz` — the host's IANA zone.** The team has no single
+     zone, so scheduling is anchored to the **host** (the machine that fires the
+     scheduled task). Detect it from the host and **confirm it with the host**, falling
+     back to asking if you can't read it:
+     ```bash
+     timedatectl show -p Timezone --value 2>/dev/null \
+       || cat /etc/timezone 2>/dev/null \
+       || readlink -f /etc/localtime | sed 's#.*/zoneinfo/##'
+     ```
+     Write the detected zone into **both** `config.timezone` and
+     `config.run_schedule.tz` so the just-in-time logic and the cron agree by
+     construction.
+   - **`organizer_email` and `calendar_id`** — the account that owns the invites.
+   - **lunch window / run schedule** — keep the defaults unless the host wants to
+     change them. The default schedule is hourly 07:40–11:40 in the host zone
+     (`{"from": "07:40", "to": "11:40", "every_min": 60}`); widen it at setup if the
+     team spreads across far-apart zones.
 5. **No roster to seed.** Upload an empty `participants` snapshot
    (`{"participants": []}`); the roster fills itself from channel membership on the
    first run.
 
 Then do the first real run as a **dry-run** (Guardrails) — show the proposed groups,
 invites, and messages to the organizer before anything reaches the team.
+
+**Create the recurring schedule — last, and only after install is confirmed.** A
+schedule created *before* the plugin is registered fires background sessions with no
+skill/messenger and can't pair, so set it up only once the install is confirmed (after
+the dry-run is a good time). Create **one recurring scheduled task** at the host-local
+times that match `config.run_schedule` — **no timezone offset**, since Cowork's cron
+fires in host-local time (for the 07:40–11:40 default that's `40 7-11 * * 1-5`). Give
+it a **minimal prompt** — exactly:
+
+> `Run the lunch-roulette skill for today.`
+
+Do **not** inline config (channel_id, timezone, lunch window, organizer,
+run_schedule) into the prompt: every run reads the newest config from Drive, so the
+prompt must not duplicate state that would then drift from that source of truth.
+Ensure the scheduled session has the Slack, Calendar, and Drive connectors. Full
+guidance: [references/scheduling.md](references/scheduling.md).
 
 ## Guardrails (read before sending anything)
 

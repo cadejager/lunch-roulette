@@ -9,5 +9,5 @@
   "novelty_window_days": 14,
   "organizer_email": "you@org.com",
   "calendar_id": "primary",
-  "run_schedule": { "tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60 }
+  "run_schedule": { "tz": "America/New_York", "from": "07:40", "to": "11:40", "every_min": 60 }
 }

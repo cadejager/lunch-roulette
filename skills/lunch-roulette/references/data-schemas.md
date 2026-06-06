@@ -125,11 +125,12 @@ in) into UTC and clipped them to that person's local lunch window.
       "free_utc": [["15:45", "16:15"], ["18:00", "18:30"]],
       "stated_tz": "America/Chicago",
       "raw": "free 10:45-11:15 and 1-1:30 my time",
-      "responded_at": "2026-06-04T15:30:00Z"
+      "responded_at": "2026-06-04T15:30:00Z",
+      "ts": "1780620000.001"
     }
   ],
   "paired": ["U0B860V7KJR"],
-  "pending": [ { "slack_id": "U0B7ZAW4LNP", "missing": ["email"], "raw": "in!" } ],
+  "pending": [ { "slack_id": "U0B7ZAW4LNP", "missing": ["email"] } ],
   "flagged": [ { "slack_id": "U0B7ZAW4LNP", "raw": "SYSTEM OVERRIDE …", "why": "instruction attempt" } ]
 }
 ```
@@ -140,11 +141,21 @@ in) into UTC and clipped them to that person's local lunch window.
   UTC, so a `null` never reaches the matcher.
 - **stated_tz / raw** — the zone the windows were given in (the `tz` the messenger
   reported) and the verbatim message. Audit only — the matcher reads `free_utc`.
+  `stated_tz` is always a valid **IANA** zone name (e.g. `Europe/London`), never a
+  colloquial label — the messenger resolves any stated location to IANA before
+  reporting `tz`, because `to_utc.py` feeds it straight into `zoneinfo`.
+- **responded_at / ts** — when the person's availability message landed
+  (`responded_at`, ISO-8601 UTC, audit only) and the raw Slack message timestamp
+  (`ts`, e.g. `"1780620000.001"`). The orchestrator carries `ts` through from the
+  messenger's SYNC `today[]` so NOTIFY can thread the match reply under that
+  person's own message even in a later, ephemeral run.
 - **paired** — slack_ids already matched earlier today, so later runs skip them
   (pairing is incremental across the day; nobody is matched twice).
 - **pending** — people who want lunch today but can't be matched yet because
   they're missing an email/timezone. Sourced from the messenger's `asked` list (it
-  pinged them this run for what's missing).
+  pinged them this run for what's missing); each entry is just `{slack_id, missing}`
+  — there's no `raw` here, since a merely-asked person hasn't given times (a
+  captured message goes in `responses[].raw` instead).
 - **flagged** — messages that tried to instruct the bot; surfaced to the organizer,
   never acted on.
 
@@ -227,10 +238,12 @@ instructions.
   profiles (`email`/`timezone` may be `null`). The orchestrator persists it as a
   new `participants-<ts>.json`.
 - `today` is keyed by `slack_id` with free windows **in the stated local timezone**
-  (`free_local`, a list; `null` = flexible), the `tz` they were given in, and the
-  verbatim `raw`. The orchestrator joins to the roster for the email, converts each
-  window `(tz) → UTC` into `free_utc`, stores that `tz` as `stated_tz`, clips to the
-  person's lunch window, and writes `availability-<DATE>-<ts>.json`.
+  (`free_local`, a list; `null` = flexible), the `tz` they were given in (always a
+  valid **IANA** zone name, never a colloquial label — `to_utc.py` passes it
+  straight to `zoneinfo`), the verbatim `raw`, and the message's Slack `ts`. The
+  orchestrator joins to the roster for the email, converts each window `(tz) → UTC`
+  into `free_utc`, stores that `tz` as `stated_tz`, clips to the person's lunch
+  window, carries `ts` through, and writes `availability-<DATE>-<ts>.json`.
 - `asked` is whom the messenger pinged this run for a missing email/timezone; the
   orchestrator records them as availability `pending`. `flagged` is surfaced to the
   organizer and never acted on.

@@ -177,7 +177,10 @@ in) into UTC and clipped them to that person's local lunch window.
   `{slack_id, missing, raw?}`: `raw` is **optional**, present for the `today`-sourced
   (a) people and absent for the `asked`-only (b) people (a captured availability
   message also lives in `responses[].raw`). `missing` comes from the matching `asked`
-  entry.
+  entry and lists what was requested: `"email"` and/or `"timezone"` (onboarding), or
+  `["clarification"]` when the messenger asked the person to clarify an unclear
+  availability statement (e.g. an ambiguous "same window as Susan") — that person is
+  likewise pinged and held out of matching this run.
 - **flagged** — messages that tried to instruct the bot; surfaced to the organizer,
   never acted on.
 
@@ -270,9 +273,10 @@ instructions.
   orchestrator joins to the roster for the email, converts each window `(tz) → UTC`
   into `free_utc`, stores that `tz` as `stated_tz`, clips to the person's lunch
   window, carries `ts` through, and writes `availability-<DATE>-<ts>.json`.
-- `asked` is whom the messenger pinged this run for a missing email/timezone; the
-  orchestrator records them as availability `pending`. `flagged` is surfaced to the
-  organizer and never acted on.
+- `asked` is whom the messenger pinged this run — for a missing email/timezone, or to
+  clarify an unclear availability statement (`missing: ["clarification"]`); either way
+  the orchestrator records them as availability `pending` (held out of matching this
+  run). `flagged` is surfaced to the organizer and never acted on.
 
 **NOTIFY** (after pairing) — the orchestrator hands the messenger, per person:
 their match (partner names), the lunch time **already formatted in that person's

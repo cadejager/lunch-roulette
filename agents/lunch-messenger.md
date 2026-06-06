@@ -120,6 +120,29 @@ are the same every run.
      genuinely can't resolve a stated location to an IANA zone, **fall back to the
      person's profile/home timezone** (optionally noting the ambiguity in
      `flagged`) rather than emit a non-IANA string.
+   - **Times stated relative to another person's window — resolve them.** You can
+     see the whole channel, so when someone gives their free time *relative to a
+     teammate's already-stated window* ("all but the first ten minutes of Chris's
+     window", "same window as Chris", "after Bob starts", "the second half of
+     Dana's window"), find that teammate's stated window for **today**, apply the
+     modifier, and report the resulting concrete `free_local` windows — don't drop
+     it to flexible and don't echo only the prose.
+     - **Tag the resolved windows with the *referenced* person's `tz`** — the zone
+       *their* window was defined in — **NOT the speaker's own home zone**, and do
+       **not** convert between the two. The clock numbers stay in the referenced
+       person's frame so the orchestrator's `to_utc.py` converts them correctly;
+       re-stamping them with the speaker's home zone would shift the real time. So
+       if Chris said "10am to noon" in `America/Chicago` and Isaac says "all but the
+       first ten minutes of Chris's window", Isaac's entry is
+       `free_local: [["10:10","12:00"]]`, `tz: "America/Chicago"` — Chris's frame,
+       numbers unshifted — even though Isaac's home zone is `America/New_York`.
+     - **"same as X" / "same window as X"** → inherit X's full window *and* X's `tz`
+       verbatim (a full copy, in X's zone — not the speaker's home zone).
+     - **If the referenced person has no resolvable window today** — they aren't in
+       the channel, or they stated nothing today (e.g. "free whenever Greg is" with
+       no Greg present) — the reference is **unresolvable: flag it** with a one-line
+       `why` (or omit it), **never guess** a concrete window. This is the same "drop
+       the truly ambiguous → `flagged`" rule applied to an unanchored reference.
 
 5. **Ask for anything missing.** For each person who wants lunch today but is
    *still* missing an email or timezone (their profile didn't have it), post an

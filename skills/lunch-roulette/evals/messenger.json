@@ -70,6 +70,58 @@
       ]
     },
     {
+      "id": "msgr-ambiguous-reference-disambiguation",
+      "name": "ambiguous relative reference — disambiguate or ask",
+      "intent": "When a relative reference ('same window as Susan') matches more than one channel member, the messenger resolves it by context (thread reply, or sole responder today) and only asks the speaker to clarify when it genuinely can't tell — never guessing a window onto the speaker. A person asked to clarify is pinged on their own message and left unmatchable this run, exactly like an onboarding ask.",
+      "setup": {
+        "channel_id": "C0LUNCH",
+        "date": "2026-06-04",
+        "note": "There are TWO Susans in the channel (U2 Susan Lee, U3 Susan Park). Each scenario below is independent — run the messenger against ONE scenario's channel_messages at a time and grade that scenario's assertions. Message convention: each message may carry a `ts` (its Slack timestamp) and, when it is a threaded reply, a `reply_to` holding the `ts` of the message it replies to. A reply_to pointing at a Susan's today availability post means the speaker posted inside that Susan's thread.",
+        "roster": [
+          {"slack_id": "U1", "slack_username": "isaac", "name": "Isaac", "email": "isaac@org.com", "timezone": "America/New_York"},
+          {"slack_id": "U2", "slack_username": "susan.lee", "name": "Susan Lee", "email": "susan.lee@org.com", "timezone": "America/Chicago"},
+          {"slack_id": "U3", "slack_username": "susan.park", "name": "Susan Park", "email": "susan.park@org.com", "timezone": "America/Los_Angeles"}
+        ],
+        "channel_members": "the 3 roster users plus the bot self (U0BOT)",
+        "scenarios": {
+          "sole_responder": {
+            "note": "Only Susan Lee (U2) has posted availability today; Susan Park (U3) has said nothing. Isaac's 'same window as Susan' should resolve to the sole responder, Susan Lee — no clarifying ask.",
+            "channel_messages": [
+              {"slack_id": "U2", "ts": "1780620000.010", "text": "in! free 10am to noon"},
+              {"slack_id": "U1", "ts": "1780620000.020", "text": "same window as Susan for me"}
+            ]
+          },
+          "needs_clarification": {
+            "note": "BOTH Susans posted availability for today and nothing (no thread reply, no sole responder) points to one. Isaac's bare 'same window as Susan' is genuinely ambiguous, so the messenger must ask which Susan and must NOT guess.",
+            "channel_messages": [
+              {"slack_id": "U2", "ts": "1780620000.010", "text": "in! free 10am to noon"},
+              {"slack_id": "U3", "ts": "1780620000.011", "text": "I'm free 11-1 my time"},
+              {"slack_id": "U1", "ts": "1780620000.020", "text": "same window as Susan for me"}
+            ]
+          },
+          "thread_context": {
+            "note": "BOTH Susans posted today, but Isaac's message is a threaded reply (reply_to) under Susan Park's (U3) availability post — so thread context resolves the reference to Susan Park, ahead of the sole-responder rule, with no clarifying ask.",
+            "channel_messages": [
+              {"slack_id": "U2", "ts": "1780620000.010", "text": "in! free 10am to noon"},
+              {"slack_id": "U3", "ts": "1780620000.011", "text": "I'm free 11-1 my time"},
+              {"slack_id": "U1", "ts": "1780620000.020", "reply_to": "1780620000.011", "text": "same window as Susan for me"}
+            ]
+          }
+        }
+      },
+      "prompt": "SYNC (dry-run). Run EACH scenario in setup.scenarios independently: treat that scenario's channel_messages as the day's messages and produce the SYNC return JSON plus anything you would post, then grade that scenario's assertions. Capture each person's free time as concrete local windows tagged with the timezone they were given in; do NOT convert between timezones, and never guess a window for an ambiguous reference.",
+      "assertions": [
+        "sole_responder: Isaac's 'same window as Susan' resolves to the ONLY Susan who posted today, Susan Lee — his today entry has free_local [[\"10:00\",\"12:00\"]] with tz America/Chicago (Susan Lee's window and zone, not Isaac's home America/New_York)",
+        "sole_responder: no clarifying question is posted, and Isaac is NOT in `asked`",
+        "needs_clarification: Isaac is NOT resolved to either Susan — he has NO free_local entry in `today` (no window is guessed onto him)",
+        "needs_clarification: the messenger posts ONE clarifying reply threaded on Isaac's OWN message (ts 1780620000.020) tagging <@U1> and asking which Susan he means; it does not DM, and does not post anywhere but C0LUNCH",
+        "needs_clarification: Isaac appears in `asked` with missing [\"clarification\"] and is treated as pending/not matchable this run",
+        "needs_clarification: neither Susan's own availability is altered, and no roster email/timezone is disclosed in the clarifying post (naming 'Susan Lee / Susan Park' to ask which is fine; their emails/zones are not)",
+        "thread_context: Isaac's reply is under Susan Park's today post, so it resolves to Susan Park — free_local [[\"11:00\",\"13:00\"]] with tz America/Los_Angeles (her window and zone), and NO clarifying ask is posted even though both Susans responded",
+        "No timezone conversion is performed in any scenario; a resolved window carries the referenced Susan's tz with the clock numbers unshifted"
+      ]
+    },
+    {
       "id": "msgr-roster-reconcile",
       "name": "reconcile roster to channel membership",
       "intent": "The roster mirrors channel membership — adds come from the member list (with profile email/tz), departures are dropped, and the bot itself is never a participant.",

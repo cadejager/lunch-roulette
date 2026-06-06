@@ -38,6 +38,38 @@
       ]
     },
     {
+      "id": "msgr-relative-time-references",
+      "name": "availability stated relative to another person's window",
+      "intent": "People can phrase their free time relative to someone else's stated window (e.g. 'all but the first ten minutes of Chris's window'). The messenger resolves it against that person's already-stated window and reports it in THAT person's timezone — never converting zones — and flags a reference it genuinely cannot resolve rather than guessing.",
+      "setup": {
+        "channel_id": "C0LUNCH",
+        "date": "2026-06-04",
+        "roster": [
+          {"slack_id": "U1", "slack_username": "chris", "name": "Chris", "email": "chris@org.com", "timezone": "America/Chicago"},
+          {"slack_id": "U2", "slack_username": "isaac", "name": "Isaac", "email": "isaac@org.com", "timezone": "America/New_York"},
+          {"slack_id": "U3", "slack_username": "dana", "name": "Dana", "email": "dana@org.com", "timezone": "America/Los_Angeles"},
+          {"slack_id": "U4", "slack_username": "erin", "name": "Erin", "email": "erin@org.com", "timezone": "America/New_York"}
+        ],
+        "channel_members": "the 4 roster users plus the bot self (U0BOT)",
+        "channel_messages": [
+          {"slack_id": "U1", "text": "in! free 10am to noon"},
+          {"slack_id": "U2", "text": "I'll take all but the first ten minutes of Chris's window"},
+          {"slack_id": "U3", "text": "same window as Chris works for me"},
+          {"slack_id": "U4", "text": "I'm free whenever Greg is free"}
+        ],
+        "note": "Chris (U1) states a concrete window in his own zone. Isaac (U2) and Dana (U3) phrase theirs relative to Chris's window. Erin (U4) references Greg, who is not in this channel and has stated nothing — her reference is unresolvable."
+      },
+      "prompt": "SYNC (dry-run). Here is the channel state. Produce your SYNC return JSON and list anything you would post (do not actually post). Capture each person's free time as concrete local windows tagged with the timezone they were given in; do NOT convert between timezones.",
+      "assertions": [
+        "Chris's today entry has free_local [[\"10:00\",\"12:00\"]] with tz America/Chicago (his own zone)",
+        "Isaac's relative reference is RESOLVED (not flagged): his today entry has free_local [[\"10:10\",\"12:00\"]] — Chris's 10:00-12:00 window with the first ten minutes removed",
+        "Isaac's tz is America/Chicago — the zone Chris's window was given in — NOT his home America/New_York; the clock numbers are reported in Chris's frame with no timezone conversion",
+        "Dana's 'same window as Chris' resolves to free_local [[\"10:00\",\"12:00\"]] with tz America/Chicago (full inherit), again not her home America/Los_Angeles",
+        "Erin's reference to Greg is unresolvable (Greg stated no window and isn't present): it is flagged or omitted, never guessed into a concrete window",
+        "No timezone conversion is performed anywhere; a resolved window carries the referenced person's tz with the clock numbers unshifted"
+      ]
+    },
+    {
       "id": "msgr-roster-reconcile",
       "name": "reconcile roster to channel membership",
       "intent": "The roster mirrors channel membership — adds come from the member list (with profile email/tz), departures are dropped, and the bot itself is never a participant.",

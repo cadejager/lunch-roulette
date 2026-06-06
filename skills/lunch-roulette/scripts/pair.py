@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Pair lunch participants into groups of two (one group of three when the count
 is odd), avoiding recent repeats, working entirely in **UTC**.
 

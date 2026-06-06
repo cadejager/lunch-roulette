@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Deterministic tests for pair.py (UTC matcher). Run: python test_pair.py
 
 Everything is in UTC "HH:MM"; the orchestrator does all timezone work upstream,

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Tests for record_round.py — the append-only round writer. Run: python test_record_round.py
 
 Covers: extracting groups from a pair.py result, first-write, merging into the

@@ -202,3 +202,11 @@ The plugin is packaged straight from the source tree (run from the repo root; th
 ```bash
 git archive --format=zip --prefix=lunch-roulette/ -o lunch-roulette-v0.3.0.zip HEAD
 ```
+
+## License
+
+Licensed under the **GNU AGPL-3.0-or-later** — see [`LICENSE`](LICENSE).
+
+This is a strong copyleft license: derivatives stay under the same terms, and — per the AGPL's §13 network clause — anyone who runs a modified version as a network service must offer that service's users its source.
+
+© 2026 Chris DeJager

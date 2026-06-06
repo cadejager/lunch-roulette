@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Tests for schedule.py — the just-in-time run logic. Run: python test_schedule.py
 
 Includes the three scheduling scenarios we care about:

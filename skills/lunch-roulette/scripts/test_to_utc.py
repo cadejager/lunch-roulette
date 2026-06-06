@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chris DeJager
 """Tests for to_utc.py — the local→UTC availability conversion. Run: python test_to_utc.py
 
 Covers the DST-sensitive arithmetic an LLM would get wrong: per-zone conversion,

@@ -33,6 +33,73 @@ messenger misparsing a time or the orchestrator mis-converting it?).
   catch contract-seam bugs the isolated evals miss. Kept small; the component evals
   do the heavy lifting.
 
+## Running Layer 2/3 — the harness
+
+Layer 2/3 are **LLM evals**, so there is no `node`/`pytest` runner: grading needs
+agent orchestration (dry-run the agent, then an **LLM judge** scores the output
+against `assertions`). The harness is therefore a **Claude Code Workflow**
+(`harness.workflow.mjs`) — multi-agent, run by the Workflow tool, not by `node`.
+(Layer 1 stays plain `python scripts/test_*.py`; the harness never re-tests that
+math — see "What these are NOT" below.)
+
+**Run it (report mode) from the repo root:**
+
+```js
+Workflow({ scriptPath: "skills/lunch-roulette/evals/harness.workflow.mjs" })
+```
+
+It **loads** all three eval files into one flat list, then **grades** each eval —
+`produce` (a target-aware dry-run: the messenger reads `agents/lunch-messenger.md`;
+the orchestrator reads `SKILL.md` and *may run the real `scripts/*.py`*; integration
+chains both — always *reporting* what it would do, never touching Slack/Calendar/
+Drive) → `judge` (strict, one verdict per assertion). It returns a table:
+
+- `total` / `passed` — headline count.
+- `failed[]` — `{ id, pass_rate, failed_assertions, summary }` for each miss, so you
+  can see *which* assertion failed and the judge's one-line reason.
+- `all[]` — `{ id, pass }` for every eval.
+
+Report mode **edits nothing** — it's the already-validated grade-and-report logic.
+
+### Options (`args`, all optional)
+
+- `args.samples` (default `1`) — grade each eval this many times; an eval passes on
+  a **majority** of samples and the row reports its `pass_rate`. Use this to get the
+  **pass-rate ± variance** this README asks for — a single LLM run varies, so one
+  green run isn't a pass.
+- `args.fix` (default `false`) — opt into the auto-fix loop below.
+- `args.maxRounds` (default `3`) — cap on auto-fix rounds.
+
+### Auto-fix loop (`args.fix: true`)
+
+```js
+Workflow({ scriptPath: "skills/lunch-roulette/evals/harness.workflow.mjs",
+           args: { fix: true, maxRounds: 3 } })
+```
+
+Loops up to `maxRounds`: **grade → diagnose each failure → fix the right file →
+re-grade**, stopping when everything is green (or no round makes progress / every
+remaining failure is flagged). For each failure it spawns a **diagnose-and-fix**
+agent that reads the eval, the produced output, the judge's failed-assertion
+reasoning, and the relevant design docs, then decides the **root cause**:
+
+- the **assertion is wrong / over-strict** (the behavior is actually spec-correct) →
+  it fixes the **eval JSON**; or
+- the **plugin is genuinely wrong** → it fixes the **spec/script**, keeping the
+  messenger↔orchestrator contract (`SKILL.md` / `references/data-schemas.md` /
+  `agents/lunch-messenger.md`) in lockstep.
+
+Crucially, if it **can't confidently decide**, or a "fix" would change core/intended
+behavior, it **flags** the eval instead of editing — the loop never forces an
+assertion green by mangling correct behavior, and never re-attempts a flagged eval.
+(This is the lesson from a run that graded 19/20: the one "failure" was a wrong
+assertion, not a plugin bug.)
+
+**The fixers edit the working tree in place** (they are *not* worktree-isolated, so
+the next round's `produce` sees the change). So run `fix:true` on a **dedicated
+branch**, then review the accumulated diff and open a PR — the harness itself never
+pushes or opens PRs. It returns `{ rounds, green, fixed[], flagged[], final[] }`.
+
 ## Eval format
 
 Each file declares its `target` once at the top

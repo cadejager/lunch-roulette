@@ -77,17 +77,7 @@ The messenger↔orchestrator data contract lives in three files that must agree:
 
 ## Repo workflow
 
-`main` is **branch-protected** and requires a PR review to merge. Work on a branch, push, and open a PR via `gh`. The `gh` account here is a non-admin collaborator, so it **cannot self-merge** — the repo owner approves and merges.
-
-Right after opening a PR, set it to **auto-merge**, so it lands the moment the owner approves (no manual merge step):
-
-```bash
-gh pr merge <number> --auto --merge
-```
-
-(`main`'s required review blocks an immediate merge, so `--auto` queues it until the approval lands.) The repo has **Allow auto-merge** and **Automatically delete head branches** enabled, so on approval the PR merges and its source branch is deleted automatically — no `--delete-branch` flag needed.
-
-Local scratch/working dirs are gitignored via an `_*/` convention (e.g. the skill's runtime `_work/` download→compute→upload dir).
+GitHub workflow (branches/worktrees, auto-merge by default, the non-admin merge model, branch cleanup) follows the global `~/.claude/CLAUDE.md`. Repo-specific: `main` is **branch-protected** and requires a PR review, so `gh pr merge <number> --auto --merge` queues until the owner approves.
 
 ## Evals
 

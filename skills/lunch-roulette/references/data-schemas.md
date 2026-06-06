@@ -148,7 +148,8 @@ in) into UTC and clipped them to that person's local lunch window.
   (`responded_at`, ISO-8601 UTC, audit only) and the raw Slack message timestamp
   (`ts`, e.g. `"1780620000.001"`). The orchestrator carries `ts` through from the
   messenger's SYNC `today[]` so NOTIFY can thread the match reply under that
-  person's own message even in a later, ephemeral run.
+  person's own availability message. Best-effort: when `ts` isn't on hand the
+  messenger finds a sensible anchor (or posts top-level) instead.
 - **paired** — slack_ids already matched earlier today, so later runs skip them
   (pairing is incremental across the day; nobody is matched twice).
 - **pending** — people who want lunch today but can't be matched yet because

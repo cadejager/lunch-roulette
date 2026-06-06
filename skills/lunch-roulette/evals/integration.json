@@ -62,7 +62,7 @@
           "note": "U1's later window (11-11:30 ET = 15:00-15:30 UTC) is still open; U1 was carried from run 1."
         }
       },
-      "prompt": "Run run_1 at 12:00Z, then run_2 at 14:30Z (dry-run each). Show, per run, the due pool, any groups, and any messages posted.",
+      "prompt": "Run run_1 at 12:00Z, then run_2 at 14:00Z (dry-run each). Show, per run, the due pool, any groups, and any messages posted.",
       "assertions": [
         "Run 1: U1 is due (early window) but alone → not matched, and is NOT sent a no-match message (a later window survives)",
         "Run 1: U1's availability is persisted in UTC and carried forward (not dropped)",

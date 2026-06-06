@@ -3,8 +3,11 @@
   "version": "0.3.0",
   "description": "Daily lunch roulette for remote teams: invites people in a Slack channel, learns who's free today and when, pairs them into twos (or a three when odd) while rotating day to day, and sends Google Calendar invites with a Google Meet. A trusted orchestrator skill does the matching, timezone math (UTC), and calendar/Drive writes; a tool-locked lunch-messenger subagent (Sonnet) handles all Slack conversation with coworkers.",
   "author": {
-    "name": "Lunch Roulette"
+    "name": "Chris DeJager",
+    "email": "chris@dejagers.net"
   },
+  "license": "MIT",
+  "homepage": "https://github.com/cadejager/lunch-roulette",
   "keywords": [
     "lunch",
     "lunch roulette",

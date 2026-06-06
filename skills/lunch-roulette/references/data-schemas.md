@@ -253,10 +253,14 @@ instructions.
 - `roster` is reconciled to channel membership with email/timezone filled from
   profiles (`email`/`timezone` may be `null`). The orchestrator persists it as a
   new `participants-<ts>.json`.
-- `today` is keyed by `slack_id` with free windows **in the stated local timezone**
-  (`free_local`, a list; `null` = flexible), the `tz` they were given in (always a
-  valid **IANA** zone name, never a colloquial label — `to_utc.py` passes it
-  straight to `zoneinfo`), the verbatim `raw`, and the message's Slack `ts`. The
+- `today` is keyed by `slack_id` with the person's **parsed** free windows **in the
+  stated local timezone** (`free_local`, a list of `["HH:MM","HH:MM"]`; `null` =
+  flexible) — this is the field the orchestrator and matcher use, so the messenger
+  always parses a stated time into it rather than returning prose. Plus the `tz` they
+  were given in (always a valid **IANA** zone name, never a colloquial label —
+  `to_utc.py` passes it straight to `zoneinfo`; the messenger never converts zones
+  itself), the verbatim `raw` (**audit only**, never a substitute for `free_local`),
+  and the message's Slack `ts`. The
   orchestrator joins to the roster for the email, converts each window `(tz) → UTC`
   into `free_utc`, stores that `tz` as `stated_tz`, clips to the person's lunch
   window, carries `ts` through, and writes `availability-<DATE>-<ts>.json`.

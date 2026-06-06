@@ -61,15 +61,31 @@ def to_hhmm(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
+def merge_intervals(intervals: list[list[int]]) -> list[list[int]]:
+    """Coalesce overlapping AND adjacent [start, end] minute intervals into the
+    fewest maximal spans. Adjacent matters: a person free 16:00-16:20 and
+    16:20-16:40 has a continuous 40-minute span, but as two pieces neither meets a
+    30-minute duration floor, so they would wrongly read as unmatchable. Merging
+    where ``next.start <= cur.end`` fixes that."""
+    out: list[list[int]] = []
+    for s, e in sorted(intervals):
+        if out and s <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return out
+
+
 def intersect_intervals(a: list[list[int]], b: list[list[int]]) -> list[list[int]]:
-    """Intersection of two sets of [start, end] minute intervals."""
+    """Intersection of two sets of [start, end] minute intervals, with adjacent
+    pieces merged so a continuous span split across windows reads as one."""
     out: list[list[int]] = []
     for s1, e1 in a:
         for s2, e2 in b:
             lo, hi = max(s1, s2), min(e1, e2)
             if hi > lo:
                 out.append([lo, hi])
-    return out
+    return merge_intervals(out)
 
 
 def common_free(members: list[dict]) -> list[list[int]]:
@@ -92,19 +108,37 @@ def earliest_slot(intervals: list[list[int]], duration: int) -> list[int] | None
 
 
 # --- Loading & normalization ---------------------------------------------
+def _parse_hhmm(value) -> int | None:
+    """Best-effort ``"HH:MM"`` -> minutes; None if not a well-formed clock time."""
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
+    if not s:
+        return None
+    try:
+        return to_minutes(s)
+    except (ValueError, AttributeError):
+        return None
+
+
 def parse_free_utc(free_utc: list | None) -> list[list[int]]:
     """Turn a person's UTC free windows (``[["HH:MM","HH:MM"], ...]``) into minute
-    intervals. The orchestrator supplies closed UTC intervals already clipped to
-    the person's lunch window, so there is nothing to clip or fill here; anything
-    malformed (open-ended or zero-length) is simply dropped."""
+    intervals, with overlapping/adjacent pieces merged into maximal spans. The
+    orchestrator supplies closed UTC intervals already clipped to the person's
+    lunch window, so there is nothing to clip or fill here; anything malformed —
+    not a closed pair, missing/None/empty/whitespace endpoint, non-numeric, or
+    zero-length — is simply dropped (per the matcher's degrade-don't-crash
+    contract, since these inputs trace back to messy human messages)."""
     out: list[list[int]] = []
     for item in free_utc or []:
-        if not item or item[0] is None or item[1] is None:
+        if not item or len(item) < 2:
             continue
-        s, e = to_minutes(item[0]), to_minutes(item[1])
+        s, e = _parse_hhmm(item[0]), _parse_hhmm(item[1])
+        if s is None or e is None:
+            continue
         if e > s:
             out.append([s, e])
-    return out
+    return merge_intervals(out)
 
 
 def load_participants(path: str | None) -> dict[str, dict]:

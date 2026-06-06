@@ -13,12 +13,20 @@ already **clipped to that person's lunch band**:
 
   * a flexible person (`free_local` null/empty) becomes their whole lunch band,
   * an open-ended window (`["12:30", null]`) is clipped to the band's end,
+  * an open-start window (`[null, "13:00"]`) starts at the band's start,
   * anything entirely outside the band drops out.
+
+Inputs come (via an LLM messenger) from messy human Slack messages, so a single
+malformed window degrades rather than crashing the run: an empty element, an
+unparseable time (`"9"`, `"noon"`, `"24:00"`), or a window that would wrap past a
+UTC day boundary is dropped with a one-line note to stderr (stdout stays clean
+JSON). The exception is a misconfigured band (`earliest >= latest`), which raises
+`ValueError` rather than silently zeroing out everyone's availability.
 
 `zoneinfo` handles DST automatically from the date. UTC windows are assumed to fall
 within a single UTC day, which holds for the Americas (a daytime local lunch maps to
 afternoon/evening UTC); a team spanning the date line would need date-aware windows,
-which is out of scope here.
+which is out of scope here — such windows are detected and dropped, not corrupted.
 
 Usage (CLI, for the orchestrator):
     python to_utc.py --tz America/Chicago --date 2026-06-04 \
@@ -41,32 +49,82 @@ UTC = ZoneInfo("UTC")
 
 
 def _local_dt(d: date_cls, hhmm: str, tz: ZoneInfo) -> datetime:
-    h, m = (int(x) for x in hhmm.strip().split(":"))
+    """Parse a local ``"HH:MM"`` on date `d` into an aware datetime.
+
+    Raises ``ValueError`` on anything not a well-formed in-range 24h clock time
+    (no colon, non-numeric, out-of-range hour/minute) so callers can drop just
+    the offending window rather than crash the whole run."""
+    if not isinstance(hhmm, str):
+        raise ValueError(f"time must be a string, got {hhmm!r}")
+    parts = hhmm.strip().split(":")
+    if len(parts) != 2:
+        raise ValueError(f"unparseable time {hhmm!r} (expected HH:MM)")
+    try:
+        h, m = int(parts[0]), int(parts[1])
+    except ValueError:
+        raise ValueError(f"unparseable time {hhmm!r} (non-numeric)")
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        raise ValueError(f"time out of range {hhmm!r}")
     return datetime(d.year, d.month, d.day, h, m, tzinfo=tz)
 
 
 def to_free_utc(free_local, tz_name: str, date_str: str, lunch_window_local: dict):
-    """Local windows -> list of UTC ["HH:MM","HH:MM"], clipped to the lunch band."""
+    """Local windows -> list of UTC ["HH:MM","HH:MM"], clipped to the lunch band.
+
+    Inputs are derived from messy human Slack messages, so this degrades rather
+    than crashing: an individually malformed window (empty, unparseable time, or
+    one that would wrap past a UTC day boundary) is dropped with a one-line note
+    to stderr, leaving the rest. The one thing that *does* raise is a misconfigured
+    band (earliest >= latest), because silently returning ``[]`` for everyone is a
+    zero-lunch outage with no signal — the orchestrator should surface it loudly.
+    """
     tz = ZoneInfo(tz_name)
     d = date_cls.fromisoformat(date_str)
     band_lo = _local_dt(d, lunch_window_local["earliest"], tz).astimezone(UTC)
     band_hi = _local_dt(d, lunch_window_local["latest"], tz).astimezone(UTC)
 
-    if not free_local:  # None or [] -> flexible across the whole band
-        windows = [(band_lo, band_hi)]
+    # A misconfigured band wipes out everyone's availability silently — fail loud.
+    if band_hi <= band_lo:
+        raise ValueError(
+            f"lunch_window earliest {lunch_window_local['earliest']} "
+            f"must be before latest {lunch_window_local['latest']}"
+        )
+
+    windows = []
+    if not free_local:  # None or [] (top level) -> flexible across the whole band
+        windows.append((band_lo, band_hi))
     else:
-        windows = []
         for w in free_local:
-            start = _local_dt(d, w[0], tz).astimezone(UTC)
-            end = band_hi if (len(w) < 2 or w[1] is None) else _local_dt(d, w[1], tz).astimezone(UTC)
+            if not w:  # empty/None element inside the list -> nothing stated, skip
+                continue
+            try:
+                # null/missing start -> band start; null/missing end -> band end.
+                start = band_lo if w[0] is None else _local_dt(d, w[0], tz).astimezone(UTC)
+                end = band_hi if (len(w) < 2 or w[1] is None) else _local_dt(d, w[1], tz).astimezone(UTC)
+            except ValueError as e:
+                print(f"to_utc: dropping window {w!r}: {e}", file=sys.stderr)
+                continue
             windows.append((start, end))
 
     out = []
     for start, end in windows:
         lo = max(start, band_lo)
         hi = min(end, band_hi)
-        if hi > lo:
-            out.append([lo.strftime("%H:%M"), hi.strftime("%H:%M")])
+        if hi <= lo:
+            continue
+        # The matcher assumes a single UTC day (Americas: daytime local -> same-day
+        # UTC). A non-Americas zone can push a window across UTC midnight, where
+        # strftime("%H:%M") drops the date and downstream reads end < start as
+        # garbage. Detect the wrap (start/end on different UTC dates) and drop it,
+        # rather than emit a corrupted interval. Out of scope: multi-day windows.
+        if lo.date() != hi.date():
+            print(
+                f"to_utc: dropping window {[start.strftime('%H:%M'), end.strftime('%H:%M')]} "
+                f"in {tz_name}: crosses a UTC day boundary",
+                file=sys.stderr,
+            )
+            continue
+        out.append([lo.strftime("%H:%M"), hi.strftime("%H:%M")])
     return out
 
 

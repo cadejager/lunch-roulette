@@ -326,6 +326,30 @@
         "No time is computed or converted by the messenger; the slot strings are used verbatim",
         "The returned delivery report lists the posted people (with reminder_scheduled true for the matched pair) and no failures"
       ]
+    },
+    {
+      "id": "msgr-notify-no-ts-falls-back",
+      "name": "NOTIFY with no ts: post anyway (best-effort threading)",
+      "intent": "ts is best-effort: when a NOTIFY entry has no ts to thread under, the messenger still posts the match message (top-level or a sensible anchor) rather than dropping it.",
+      "setup": {
+        "channel_id": "C0LUNCH",
+        "date": "2026-06-04",
+        "job": "NOTIFY",
+        "note": "A NOTIFY job. U1's entry has NO ts (the orchestrator couldn't supply one). The messenger must still deliver the match message; it never computes times.",
+        "notify": {
+          "matched": [
+            {"slack_id": "U1", "partner_names": ["Bob"], "slot_local": "12:00", "meeting_link": "", "reminder": {"schedule": false}}
+          ],
+          "unmatched": []
+        }
+      },
+      "prompt": "NOTIFY (dry-run). Post the match notification in setup.notify. U1 has no ts. List the message you would post (channel, thread target, text) and return your delivery report. Do not actually post.",
+      "assertions": [
+        "U1 still gets a warm in-channel match message tagging <@U1>, naming Bob, showing the slot 12:00 — it is NOT dropped for lack of a ts",
+        "With no ts to thread under, the message is posted top-level in C0LUNCH (or anchored to a sensible message), never skipped",
+        "The post targets channel C0LUNCH — no DM, no other channel",
+        "The delivery report lists U1 as posted (ok)"
+      ]
     }
   ]
 }

@@ -124,7 +124,7 @@
       "prompt": "Run this run (dry-run). It is the last scheduled run of the day. Show the due pool, the groups, the calendar invite(s), and every NOTIFY instruction (matched and unmatched).",
       "assertions": [
         "The due pool (from scripts/schedule.py) is U1, U2, and U3 — it's the last run, so everyone still active is swept (is_last_run = true)",
-        "The matcher pairs U1 & U2 (their 16:00–16:45 windows overlap by ≥30 min); U3 is left unmatched — its 16:50–17:30 window overlaps no one's by ≥30 min",
+        "From pair.py's output, U1 & U2 are the matched pair and U3 is the one left unmatched — the orchestrator consumes the matcher's groups/unmatched (it does not re-derive the overlap arithmetic, which Layer 1 owns)",
         "U1 & U2 get a calendar invite and each gets a Slack match message via NOTIFY (their slot in their own zone)",
         "Because it's the last run, should_notify_unmatched is true for U3, so the orchestrator hands U3 to the messenger NOTIFY for a kind 'couldn't line one up today' heads-up — U3 is NOT silently dropped",
         "The no-match decision is made with scripts/schedule.py, not ad hoc",
@@ -166,7 +166,8 @@
         "attendees also include the organizer (config.organizer_email, bot@org.com) with optionalAttendee: true",
         "addGoogleMeetUrl is true",
         "start/end are full ISO-8601 UTC on today's date (e.g. 2026-06-04T16:00:00Z / ...T16:30:00Z)",
-        "calendarId is config.calendar_id (bot@org.com) — the SAME id used for the existence check; summary names both people (e.g. 'Lunch roulette: Alice & Bob')"
+        "calendarId is config.calendar_id (bot@org.com) — the SAME id used for the existence check; summary names both people (e.g. 'Lunch roulette: Alice & Bob')",
+        "It notes it would confirm from create_event's returned event that the Meet attached and the organizer landed optionalAttendee:true (not required) — catching a malformed event rather than shipping it"
       ]
     },
     {
@@ -192,7 +193,7 @@
       "assertions": [
         "It finds each canvas by its sentinel (e.g. \"lunchroulette-state::availability\") and OVERWRITES it in place — it does NOT create a second/versioned canvas or file (no timestamped filenames)",
         "U1 stays in `paired` and in `notified_matched` (both carried forward); U1 is not dropped or re-paired or re-notified",
-        "Newly matched people (U3 & U4, now due at the 15:00 run) are appended to `paired` (and, once NOTIFY succeeds, to `notified_matched`) in the rewritten availability canvas; notified_unmatched is carried forward unchanged",
+        "Newly matched people (U3 & U4, now due at the 15:00 run) are appended to `paired` in the rewritten availability canvas; `notified_matched` is extended to them ONLY after the messenger confirms their match post — so in this dry-run (nothing actually posted) notified_matched is NOT yet extended to U3 & U4; notified_unmatched is carried forward unchanged",
         "The rounds canvas is rewritten in place with this run's new round merged into today's 2026-06-04 entry, and the stale 2026-05-01 entry PRUNED (older than novelty_window_days) — the 2026-06-03 entry is kept",
         "Date-rollover reset: if the availability canvas's stored date were 2026-06-03 (older than today), the orchestrator treats today's availability as empty — it does NOT carry yesterday's responses or ledgers (paired/notified_matched/notified_unmatched) into today"
       ]
@@ -259,6 +260,120 @@
         "It does NOT pre-create any state canvas (config/participants/availability/rounds are created on first write) and does not invent a roster — the participants canvas fills itself from channel membership on the first run",
         "It plans a dry-run first real run before anything reaches the team",
         "Each side-effect is confirmed with the host before doing it"
+      ]
+    },
+    {
+      "id": "orch-invite-idempotency-skip",
+      "name": "calendar invite idempotency: SKIP create when a matching event already exists",
+      "intent": "The duplicate-event existence check actually fires: when an event already exists today on config.calendar_id whose member-email set (excluding the organizer) equals this group's, the orchestrator does NOT create a second event.",
+      "setup": {
+        "now": "2026-06-04T12:00:00Z",
+        "state": {"config": {"organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "timezone": "America/New_York"}},
+        "group": {"members": [{"email": "alice@org.com", "name": "Alice"}, {"email": "bob@org.com", "name": "Bob"}], "slot_utc": {"start": "16:00", "end": "16:30"}},
+        "existing_events_today": [{"summary": "Lunch roulette: Alice & Bob", "start": "2026-06-04T16:00:00Z", "end": "2026-06-04T16:30:00Z", "attendees": ["alice@org.com", "bob@org.com", "bot@org.com"]}],
+        "note": "existing_events_today is exactly what a list_events on config.calendar_id over today's UTC window would return. The orchestrator must match on the MEMBER-email set (alice+bob, EXCLUDING the organizer bot@org.com)."
+      },
+      "prompt": "Decide whether to create the Google Calendar invite for this matched group (dry-run, no tools). Run the idempotency existence check (list_events on config.calendar_id over today returns setup.existing_events_today), compare on the member-email set, and state whether you CREATE or SKIP.",
+      "assertions": [
+        "The existence check matches the pre-existing event — its member-email set {alice@org.com, bob@org.com} (excluding the organizer bot@org.com) equals this group's — so the orchestrator SKIPS create_event and does NOT create a second event",
+        "The match is on the MEMBER-email set, not on the summary string alone",
+        "The organizer (bot@org.com) appearing on the existing event's attendees does not affect the comparison — it is excluded on both sides"
+      ]
+    },
+    {
+      "id": "orch-retry-cross-guard",
+      "name": "retry: all three guards fire together (no 2nd event, no 2nd message, no re-pair)",
+      "intent": "A retried run for people already fully handled today must not double up: the calendar event-existence check prevents a second event, notified_matched prevents a second Slack message, and paired keeps them out of the due pool.",
+      "setup": {
+        "now": "2026-06-04T12:00:00Z",
+        "state": {
+          "config": {"timezone": "America/New_York", "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "default_lunch_duration_min": 30, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
+          "participants": [{"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"}, {"slack_id": "U2", "email": "b@org.com", "timezone": "America/New_York"}],
+          "availability_today": {"date": "2026-06-04", "responses": [{"slack_id": "U1", "email": "a@org.com", "free_utc": [["12:30", "13:00"]]}, {"slack_id": "U2", "email": "b@org.com", "free_utc": [["12:30", "13:00"]]}], "paired": ["U1", "U2"], "notified_matched": ["U1", "U2"], "notified_unmatched": []},
+          "rounds": {"rounds": [{"date": "2026-06-04", "groups": [["a@org.com", "b@org.com"]]}]}
+        },
+        "sync_return": {"roster": "unchanged", "today": [], "asked": [], "flagged": []},
+        "existing_events_today": [{"summary": "Lunch roulette: A & B", "start": "2026-06-04T12:30:00Z", "end": "2026-06-04T13:00:00Z", "attendees": ["a@org.com", "b@org.com", "bot@org.com"]}],
+        "note": "A re-run after U1 & U2 were already matched, invited, notified, and recorded earlier: they are in paired + notified_matched, today's round already holds their group, and existing_events_today is what list_events returns."
+      },
+      "prompt": "Run this run again (dry-run) — it is a retry after U1 & U2 were already handled. Show the due pool, whether you would create any calendar event (run the list_events check), and which (if any) NOTIFY messages you would send.",
+      "assertions": [
+        "The due pool is EMPTY — U1 & U2 are in `paired`, so they are excluded; nobody new is paired",
+        "No calendar event is created — the existence check finds the matching event (member set a@org.com + b@org.com), so create_event is SKIPPED",
+        "No match message is sent — U1 & U2 are both in `notified_matched`, so NOTIFY skips them; there is no second Slack post",
+        "record_round does not double-record — today's round already contains the {a,b} group (de-duped by membership set)"
+      ]
+    },
+    {
+      "id": "orch-stale-fire-noop",
+      "name": "stale / out-of-window fire is a no-op (within_active_window=false)",
+      "intent": "A run that fires outside the active window (cron jitter or a retried ephemeral session after the last scheduled run) must NOT be treated as the last run: the orchestrator still syncs, but no-ops pairing and no-match finalization rather than sweeping everyone as 'no match'.",
+      "setup": {
+        "now": "2026-06-04T18:30:00Z",
+        "state": {
+          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
+          "participants": [{"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"}],
+          "availability_today": {"date": "2026-06-04", "responses": [{"slack_id": "U1", "email": "a@org.com", "free_utc": [["19:00", "19:30"]]}], "paired": [], "notified_unmatched": []},
+          "rounds": []
+        },
+        "sync_return": {"roster": "unchanged", "today": [], "asked": [], "flagged": []},
+        "note": "The schedule's last run is 12:00 ET = 16:00Z; now is 18:30Z, past last_run + grace, so scripts/schedule.py returns within_active_window=false. Naively is_last_run would be true for any time at/after the last fire — the trap this guard prevents."
+      },
+      "prompt": "Run this run (dry-run). First check scripts/schedule.py's within_active_window for this time, then show what you would (and would not) do.",
+      "assertions": [
+        "It detects via scripts/schedule.py that within_active_window is false (now 18:30Z is past the last run 16:00Z + grace)",
+        "It NO-OPs pairing and no-match finalization for this fire — it does NOT pair anyone and does NOT send U1 a 'no match' heads-up, even though U1 is unmatched",
+        "It does NOT treat this as the last run / does not sweep everyone as 'no match' — it lets the sync happen and waits for the next legitimate fire",
+        "The decision uses scripts/schedule.py's within_active_window, not an ad hoc time check"
+      ]
+    },
+    {
+      "id": "orch-triple-invite-and-notify",
+      "name": "odd headcount: one triple gets a single invite + three NOTIFY messages",
+      "intent": "When the matcher forms a three (odd count), the orchestrator creates ONE calendar event with all three members and sends each of the three a match message naming the other two.",
+      "setup": {
+        "now": "2026-06-04T12:00:00Z",
+        "state": {"config": {"timezone": "America/New_York", "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "", "lunch_reminder": true}},
+        "group": {"members": [{"email": "alice@org.com", "name": "Alice", "slack_id": "U1", "slack_username": "alice", "timezone": "America/New_York"}, {"email": "bob@org.com", "name": "Bob", "slack_id": "U2", "slack_username": "bob", "timezone": "America/Chicago"}, {"email": "carol@org.com", "name": "Carol", "slack_id": "U3", "slack_username": "carol", "timezone": "America/Los_Angeles"}], "slot_utc": {"start": "18:00", "end": "18:30"}},
+        "note": "The one triple that forms when an odd number opt in. slot_utc 18:00Z = 14:00 EDT / 13:00 CDT / 11:00 PDT."
+      },
+      "prompt": "This trio is matched. Show the create_event call you would make and the NOTIFY instructions for all three (dry-run, no tools).",
+      "assertions": [
+        "ONE calendar event is created for the trio — all three (alice@org.com, bob@org.com, carol@org.com) required, plus the organizer (bot@org.com) optionalAttendee:true, addGoogleMeetUrl:true, on config.calendar_id, with a 3-name summary (e.g. 'Lunch roulette: Alice, Bob & Carol')",
+        "Three NOTIFY messages are produced — each person is told the OTHER two are their lunch group (Alice hears Bob & Carol; Bob hears Alice & Carol; Carol hears Alice & Bob)",
+        "Each person's slot is shown in their OWN zone (18:00Z = 14:00 for Alice ET / 13:00 for Bob CT / 11:00 for Carol PT)",
+        "No secondary meeting_link line is added (config.meeting_link is empty) — the calendar invite's Meet is the join link"
+      ]
+    },
+    {
+      "id": "orch-no-meeting-link-meet-only",
+      "name": "no meeting_link: announce the Meet, don't fabricate a room",
+      "intent": "When config.meeting_link is empty, the match message announces the calendar invite + its Meet and does NOT invent a secondary room link.",
+      "setup": {
+        "now": "2026-06-04T12:00:00Z",
+        "state": {"config": {"timezone": "America/New_York", "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "", "lunch_reminder": true}},
+        "group": {"members": [{"email": "alice@org.com", "name": "Alice", "slack_id": "U1", "slack_username": "alice", "timezone": "America/New_York"}, {"email": "bob@org.com", "name": "Bob", "slack_id": "U2", "slack_username": "bob", "timezone": "America/New_York"}], "slot_utc": {"start": "16:00", "end": "16:30"}}
+      },
+      "prompt": "This group is matched and its calendar invite is created. Show the NOTIFY instructions you would hand the messenger (dry-run). config.meeting_link is empty.",
+      "assertions": [
+        "Each person's match message announces the calendar invite + its Google Meet as the join link",
+        "Because config.meeting_link is empty, NO secondary/pinned room URL is included or fabricated in the message",
+        "The slot is shown in each person's own zone and partners are named correctly"
+      ]
+    },
+    {
+      "id": "orch-reminder-off",
+      "name": "lunch_reminder false: no at-slot reminder scheduled",
+      "intent": "When config.lunch_reminder is false, the orchestrator does not instruct the messenger to schedule an at-slot reminder.",
+      "setup": {
+        "now": "2026-06-04T12:00:00Z",
+        "state": {"config": {"timezone": "America/New_York", "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "", "lunch_reminder": false}},
+        "group": {"members": [{"email": "alice@org.com", "name": "Alice", "slack_id": "U1", "slack_username": "alice", "timezone": "America/New_York"}, {"email": "bob@org.com", "name": "Bob", "slack_id": "U2", "slack_username": "bob", "timezone": "America/New_York"}], "slot_utc": {"start": "16:00", "end": "16:30"}}
+      },
+      "prompt": "This group is matched. Show the NOTIFY instructions you would hand the messenger (dry-run). config.lunch_reminder is false.",
+      "assertions": [
+        "Each person still gets a match message announcing the calendar invite",
+        "Because config.lunch_reminder is false, the orchestrator does NOT instruct the messenger to schedule any at-slot reminder (no slack_schedule_message)"
       ]
     }
   ]

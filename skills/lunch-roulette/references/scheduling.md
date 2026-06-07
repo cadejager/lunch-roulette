@@ -68,18 +68,18 @@ Create **one recurring scheduled task**, at the host-local times matching
 > `Run the lunch-roulette skill for today.`
 
 (No phase argument, and **no inlined config** — every run is the same job, and the
-orchestrator reads the newest config from Drive at run time, so the channel,
-timezone, window, organizer, and schedule all live in one place and can't drift.)
+orchestrator reads the current config from its Slack canvas at run time, so the
+channel, timezone, window, and schedule all live in one place and can't drift.)
 Create this task **only after the plugin install is confirmed** — a schedule made
 before the plugin is registered fires background sessions with no skill/messenger and
-can't pair. Make sure the scheduled session has the **Slack, Google Calendar, and
-Google Drive** connectors available: the orchestrator needs Calendar + Drive, and the
-`lunch-messenger` it spawns needs Slack.
+can't pair. Make sure the scheduled session has the **Slack** connector available —
+that's the only one needed now: the orchestrator stores all state in Slack canvases,
+and the `lunch-messenger` it spawns needs Slack too.
 
 ## Running more than one team at once
 
-Each independent pairing is its own Drive `drive_folder` + intake channel + its own
-scheduled task. Give each its own `config.json` with a distinct `drive_folder`,
+Each independent pairing is its own `state_namespace` + intake channel + its own
+scheduled task. Give each its own `config.json` with a distinct `state_namespace`,
 `channel_id`, and `run_schedule`, and name the tasks so you can tell them apart
 (e.g. "Lunch (design)"). They share the plugin and the `lunch-messenger`; they don't
 share data, so rosters and histories stay separate.

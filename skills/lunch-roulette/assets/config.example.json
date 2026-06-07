@@ -1,5 +1,5 @@
 {
-  "drive_folder": "lunch-roulette",
+  "state_namespace": "lunchroulette-state",
   "timezone": "America/New_York",
   "channel_id": "",
   "channel_name": "lunch-roulette",
@@ -7,7 +7,7 @@
   "default_lunch_duration_min": 30,
   "max_group_size": 3,
   "novelty_window_days": 14,
-  "organizer_email": "you@org.com",
-  "calendar_id": "primary",
+  "meeting_link": "",
+  "lunch_reminder": true,
   "run_schedule": { "tz": "America/New_York", "from": "07:40", "to": "11:40", "every_min": 60 }
 }

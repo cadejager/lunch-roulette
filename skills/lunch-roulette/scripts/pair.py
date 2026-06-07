@@ -25,9 +25,9 @@ Usage:
     python pair.py --availability avail.json --history history.json \
         --config config.json --participants participants.json --out groups.json
 
-Only --availability is required. --history is the *aggregated* past rounds
-(``{"rounds": [{"date", "groups"}]}``) the orchestrator builds from the per-run
-round files in Drive. Standard library only.
+Only --availability is required. --history is the past rounds
+(``{"rounds": [{"date", "groups"}]}``) — the orchestrator keeps these in a Slack
+canvas and passes them straight through. Standard library only.
 """
 
 from __future__ import annotations
@@ -290,7 +290,7 @@ def compute(availability: dict, history: dict, config: dict, participants: dict)
     duration = int(cfg["default_lunch_duration_min"])
     today = availability.get("date") or date_cls.today().isoformat()
 
-    # Only people who can actually be matched: opted in today, have a calendar
+    # Only people who can actually be matched: opted in today, have a match
     # identity (email), and have at least one usable UTC window.
     people: list[dict] = []
     for r in availability.get("responses", []):

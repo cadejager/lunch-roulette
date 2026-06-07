@@ -193,7 +193,7 @@
       "assertions": [
         "It finds each canvas by its sentinel (e.g. \"lunchroulette-state::availability\") and OVERWRITES it in place — it does NOT create a second/versioned canvas or file (no timestamped filenames)",
         "U1 stays in `paired` and in `notified_matched` (both carried forward); U1 is not dropped or re-paired or re-notified",
-        "Newly matched people (U3 & U4, now due at the 15:00 run) are appended to `paired` in the rewritten availability canvas; `notified_matched` is extended to them ONLY after the messenger confirms their match post — so in this dry-run (nothing actually posted) notified_matched is NOT yet extended to U3 & U4; notified_unmatched is carried forward unchanged",
+        "Newly matched people (U3 & U4, now due at the 15:00 run) are appended to `paired` AND to `notified_matched` (their match posts succeed this run — the availability canvas is written in step 10 after NOTIFY), while the carried-forward U1 stays in both; notified_unmatched is carried forward unchanged ([])",
         "The rounds canvas is rewritten in place with this run's new round merged into today's 2026-06-04 entry, and the stale 2026-05-01 entry PRUNED (older than novelty_window_days) — the 2026-06-03 entry is kept",
         "Date-rollover reset: if the availability canvas's stored date were 2026-06-03 (older than today), the orchestrator treats today's availability as empty — it does NOT carry yesterday's responses or ledgers (paired/notified_matched/notified_unmatched) into today"
       ]

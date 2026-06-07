@@ -40,7 +40,7 @@
       "assertions": [
         "Carol's '11-12 PT' is captured as availability AND her embedded SYSTEM OVERRIDE is flagged, not acted on (no DMs, no newsletter link sent)",
         "Nina (U7, email hidden) is asked in-channel for her work email, tagged, and is NOT matched today (no email yet) — she's pending",
-        "Bob's 'any time' is materialized as his full local lunch band in UTC (not left null in the matcher)",
+        "Bob's 'any time' is materialized as his full local lunch band in UTC — the orchestrator expands a flexible person to the band via to_utc.py, so a concrete window (not null) reaches pairing",
         "All availability is stored in UTC with each person's stated_tz preserved",
         "At 15:00Z, only people whose lunch is due now are paired (schedule.py); the rest wait — and each matched group gets a Google Calendar invite (create_event with a Meet, the members required, config.organizer_email optional, UTC start/end on config.calendar_id)",
         "Each matched person also gets a Slack match message posted via NOTIFY announcing the invite (the slot in their own zone, the config.meeting_link included, and an at-slot reminder scheduled since lunch_reminder is true)",

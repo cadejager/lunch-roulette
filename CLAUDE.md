@@ -38,7 +38,7 @@ python3 pair.py --availability avail.json --history history.json --out groups.js
 
 **Package the plugin** (from the repo root; `*.zip` is gitignored; match the version in `plugin.json`):
 ```bash
-git archive --format=zip --prefix=lunch-roulette/ -o lunch-roulette-v0.3.0.zip HEAD
+git archive --format=zip --prefix=lunch-roulette/ -o lunch-roulette-v0.4.0.zip HEAD
 ```
 
 ## Architecture — the big picture

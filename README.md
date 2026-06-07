@@ -4,7 +4,7 @@ A daily **lunch roulette** for remote teams, built as a **Claude Cowork** plugin
 
 Each workday it invites the team in a Slack channel, reads who's free and when, matches everyone into pairs — a trio when the headcount is odd, so nobody's left out — rotates the pairings day to day, and sends each group a Google Calendar invite with a Meet link.
 
-> **Status:** v0.3.0 — timezone-aware and runs hands-off on a schedule once set up.
+> **Status:** v0.4.0 — timezone-aware and runs hands-off on a schedule once set up.
 
 ## Highlights
 
@@ -200,7 +200,7 @@ Architecture, conventions, the data-contract consistency rule, and contributor w
 The plugin is packaged straight from the source tree (run from the repo root; the version comes from `plugin.json`):
 
 ```bash
-git archive --format=zip --prefix=lunch-roulette/ -o lunch-roulette-v0.3.0.zip HEAD
+git archive --format=zip --prefix=lunch-roulette/ -o lunch-roulette-v0.4.0.zip HEAD
 ```
 
 ## License

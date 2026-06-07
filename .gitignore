@@ -20,3 +20,6 @@ venv/
 
 # OS cruft
 .DS_Store
+
+# Claude Code local working dir (agent worktrees) — never commit
+.claude/

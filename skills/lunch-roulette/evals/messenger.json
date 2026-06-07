@@ -1,7 +1,7 @@
 {
   "target": "messenger",
   "agent": "lunch-messenger",
-  "note": "Dry-run: render `setup` into the agent's prompt, withhold the real Slack tools, and have it report its SYNC return JSON plus any message it would post. The bot's own user id is U0BOT (exclude from the roster). See README.md.",
+  "note": "Dry-run: render `setup` into the agent's prompt, withhold the real Slack tools, and have it report its return JSON (SYNC: roster/today/asked/flagged; or the NOTIFY delivery report) plus any message it would post or schedule. The bot's own user id is U0BOT (exclude from the roster). See README.md.",
   "evals": [
     {
       "id": "msgr-parse-variants",
@@ -295,6 +295,36 @@
         "Posts an onboarding ask for Nina's email, tagging <@U7>, as a reply threaded under Nina's message ts 1780620000.001",
         "Every post targets channel C0LUNCH; there are zero DMs and zero posts to other channels",
         "If the eval is re-run with the call-to-action already present today, it is NOT posted again"
+      ]
+    },
+    {
+      "id": "msgr-notify-match-link-and-reminder",
+      "name": "NOTIFY: include meeting_link, schedule at-slot reminder for matched; unmatched gets only a kind heads-up",
+      "intent": "On NOTIFY the messenger posts the match message the orchestrator describes (the match message IS the invite — there is no calendar): it includes the meeting_link when one is given, schedules an at-slot reminder via slack_schedule_message when asked, and threads under the person's own ts. An unmatched person gets only a kind heads-up with NO reminder. The messenger never computes times — it uses the slot string exactly as given.",
+      "setup": {
+        "channel_id": "C0LUNCH",
+        "date": "2026-06-04",
+        "job": "NOTIFY",
+        "note": "This is a NOTIFY job: the orchestrator has already paired people and pre-formatted every time in the recipient's own local zone (the messenger never converts or computes times). `notify` lists what to tell each person. A matched entry carries partner_names, the slot already formatted for that person, the message ts to thread under, an optional meeting_link to include, and reminder:{schedule:true, at:<slot time in their zone>} when an at-slot nudge should be scheduled. An unmatched entry just needs a kind heads-up and gets no reminder.",
+        "notify": {
+          "matched": [
+            {"slack_id": "U1", "partner_names": ["Bob"], "slot_local": "12:00", "ts": "1780620000.001", "meeting_link": "https://example.zoom.us/j/lunchroom", "reminder": {"schedule": true, "at": "12:00"}},
+            {"slack_id": "U2", "partner_names": ["Alice"], "slot_local": "11:00", "ts": "1780620000.002", "meeting_link": "https://example.zoom.us/j/lunchroom", "reminder": {"schedule": true, "at": "11:00"}}
+          ],
+          "unmatched": [
+            {"slack_id": "U3", "ts": "1780620000.003"}
+          ]
+        }
+      },
+      "prompt": "NOTIFY (dry-run). Post the day's match notifications described in setup.notify. For each person list the message you would post (channel, thread target, text) and any message you would SCHEDULE (channel, scheduled time, text), then return your delivery report JSON. Do not actually post or schedule. Use the slot times exactly as given — do not compute or convert any time.",
+      "assertions": [
+        "U1 gets a warm in-channel match message tagging <@U1>, naming Bob, showing the slot 12:00 exactly as given, threaded under ts 1780620000.001 — and it INCLUDES the meeting link https://example.zoom.us/j/lunchroom",
+        "Because U1's reminder.schedule is true, the messenger SCHEDULES an at-slot reminder for U1 via slack_schedule_message in C0LUNCH at 12:00 (tagging <@U1>) — a scheduled message, separate from the immediate match post",
+        "U2 likewise gets a match message naming Alice at 11:00 with the meeting link, threaded under ts 1780620000.002, and an at-slot reminder scheduled at 11:00",
+        "U3 (unmatched) gets ONLY a kind 'couldn't line one up today' heads-up tagging <@U3> (threaded under ts 1780620000.003) — NO meeting link, and NO reminder is scheduled for U3",
+        "Every post and every scheduled message targets channel C0LUNCH — zero DMs, zero other channels",
+        "No time is computed or converted by the messenger; the slot strings are used verbatim",
+        "The returned delivery report lists the posted people (with reminder_scheduled true for the matched pair) and no failures"
       ]
     }
   ]

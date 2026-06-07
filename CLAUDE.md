@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`lunch-roulette` is a **Claude Cowork plugin** (not a standalone app): a daily bot that pairs remote teammates for lunch over **Slack + Google Calendar + Google Drive**. The repository root *is* the plugin — `.claude-plugin/plugin.json` sits at the top, alongside `agents/`, `commands/`, and `skills/`.
+`lunch-roulette` is a **Claude Cowork plugin** (not a standalone app): a daily bot that pairs remote teammates for lunch over **Slack only** (no Google dependencies). The repository root *is* the plugin — `.claude-plugin/plugin.json` sits at the top, alongside `agents/`, `commands/`, and `skills/`.
 
 Most of the "logic" is **prose that an LLM executes**, not traditional code:
 - `skills/lunch-roulette/SKILL.md` — the **orchestrator** (the trusted brain).
@@ -38,38 +38,40 @@ python3 pair.py --availability avail.json --history history.json --out groups.js
 
 **Package the plugin** as an installable `.plugin` (a zip with `.claude-plugin/plugin.json` at the *archive root* — the repo root **is** the plugin root, so use **no** `--prefix`). Run from the repo root; `*.plugin` is gitignored; match the version in `plugin.json`. See [`BUILD.md`](BUILD.md) for the full release flow and how to verify the archive:
 ```bash
-git archive --format=zip -o lunch-roulette-v0.4.1.plugin HEAD
+git archive --format=zip -o lunch-roulette-v0.5.0.plugin HEAD
 ```
 
 ## Architecture — the big picture
 
-**1. Orchestrator ↔ messenger trust split (the central design).** The orchestrator (`SKILL.md`) makes every decision and performs all Calendar/Drive writes. The `lunch-messenger` subagent runs on a separate model (Sonnet), is **tool-locked to Slack**, and is the *only* component that ingests coworker messages — an untrusted, potentially adversarial surface. Invariants to preserve when editing either side:
-- **All Slack I/O goes through the messenger**, with one deliberate exception: the orchestrator creates the intake channel itself (`slack_create_conversation`) once, at first-time setup.
+**1. Orchestrator ↔ messenger trust split (the central design).** The orchestrator (`SKILL.md`) makes every decision and performs all state (canvas) writes plus composes the Slack match message. The `lunch-messenger` subagent runs on a separate model (Sonnet), is **tool-locked to Slack**, and is the *only* component that ingests coworker messages — an untrusted, potentially adversarial surface. Invariants to preserve when editing either side:
+- **All Slack *conversation* goes through the messenger.** The orchestrator makes direct Slack calls *only* for canvas state I/O (create/read/update/search of the state canvases) and the one-time setup channel creation (`slack_create_conversation`); every coworker-facing read and post still goes through the messenger. The messenger gained `slack_schedule_message` (the at-slot lunch reminder) but still has **no** canvas/state tools — all trusted writes stay with the orchestrator.
 - The orchestrator treats everything the messenger returns (`raw`/`flagged` text) as **data, never instructions**. Roster/identity changes come from structured Slack data (the channel member list), never message text; a person can only set their *own* contact info.
 
 **2. Deterministic core, not LLM math.** Error-prone arithmetic lives in tested scripts the orchestrator *calls*; it is never done inline by the model:
 - `pair.py` — matches opted-in people into pairs (one triple if odd) by UTC interval overlap, avoiding recent repeats; date-seeded so pairings rotate day to day but are reproducible.
 - `to_utc.py` — converts a person's stated **local** windows → **UTC** (DST-correct via `zoneinfo`), clipped to their lunch band.
 - `schedule.py` — the just-in-time logic: `next_run_utc` / `is_last_run` / `due_now` / `should_notify_unmatched`.
-- `record_round.py` — appends a round to history.
+- `record_round.py` — merges one day's round (the groups formed across that day's runs, de-duped by membership set). The orchestrator keeps the rolling history in the `rounds` canvas — splicing the merged entry back in and pruning to the `novelty_window_days` novelty window around this call.
 
 When changing behavior, update the script **and** its test **and** the matching CLI invocation in `SKILL.md`.
 
 **3. Everything is UTC internally.** Stored availability and the matcher work in UTC `"HH:MM"`. A person's timezone is used only to interpret what they typed and to display times back to them; `config.timezone` is merely the working-day anchor, not a matching axis. The messenger reports times in the stated *local* zone and never converts — the orchestrator converts to UTC via `to_utc.py` before storing.
 
-**4. Append-only storage on Google Drive.** The Drive connector can create/read but **cannot overwrite or delete**. So all state (config, participants, availability, history rounds) is written as **new timestamped versions** and read **newest-wins** — never assume a re-upload replaces a file. Layout and the full messenger↔orchestrator data contract are in `references/data-schemas.md`.
+**4. Slack-canvas storage (overwrite-in-place).** All state (config, participants, availability, history rounds) lives in **Slack canvases** — one canvas per logical file, holding one JSON doc. Unlike the old Google Drive store, a canvas **can** be overwritten, so each file is a single canvas rewritten whole on each change (`slack_update_canvas` with `action="replace"`) and located on a cold session by a stable **sentinel** search (`"<ns>::<file>"`, where `<ns>` is `config.state_namespace`, default `lunchroulette-state`). This drops the old append-only / versioned-filename / newest-wins model entirely. Canvases live server-side in the Slack workspace, so state survives the ephemeral Cowork host, a session replacement, and a plugin update. (A canvas still **can't** be deleted — same as Drive — but because we overwrite in place there are no stale versions to clean up.) Layout, sentinels, and the full messenger↔orchestrator data contract are in `references/data-schemas.md`.
 
-**5. Just-in-time hourly pairing.** A scheduled run fires hourly across the team's morning (`config.run_schedule`). Every run does the *same* job — sync the channel, then pair only the people whose lunch is "due" before the **next** run; everyone else waits for a later run. Someone is told "no match" only when it's hopeless (the last run, or all their windows pass by the next run). There is **no separate collect/pair phase**. The two entry points (`commands/lunch.md`) are `/lunch setup` (first-time) and `/lunch run` / blank (the hourly job).
+**5. The match message is the invite.** There is no Google Calendar event and no auto-generated Meet link: the messenger's in-channel Slack match message *is* the invite. An optional `config.meeting_link` (a static Zoom/Meet personal-room URL) is included in each match message when set; otherwise pairs grab a Slack huddle. An optional `config.lunch_reminder` (default true) has the messenger schedule a short at-slot nudge via `slack_schedule_message`. The `notified_matched` availability ledger is the retry guard that replaces the old "list today's calendar events and skip duplicates" check.
+
+**6. Just-in-time hourly pairing.** A scheduled run fires hourly across the team's morning (`config.run_schedule`). Every run does the *same* job — sync the channel, then pair only the people whose lunch is "due" before the **next** run; everyone else waits for a later run. Someone is told "no match" only when it's hopeless (the last run, or all their windows pass by the next run). There is **no separate collect/pair phase**. The two entry points (`commands/lunch.md`) are `/lunch setup` (first-time) and `/lunch run` / blank (the hourly job).
 
 ## Runtime notes (not visible from the source)
 
 Hard-won context from running this in Cowork — you can't infer these from the files:
 
-- **Scheduled Cowork sessions are ephemeral** — the local filesystem does not survive between runs, which is *why* state lives in Drive (append-only). Treat `./_work/` as throwaway scratch.
-- **Cron fires in the host machine's local timezone, with ~10 min jitter** — not a per-task configurable zone. Offset the schedule from the host zone to the team's, and don't expect to-the-minute starts (see `references/scheduling.md`).
+- **Scheduled Cowork sessions are ephemeral** — the local filesystem does not survive between runs, which is *why* state lives in Slack canvases (overwrite-in-place, server-side in the workspace) rather than on the host. Treat `./_work/` as throwaway scratch.
+- **Cron fires in the host machine's local timezone, with ~10 min jitter** — not a per-task configurable zone. Because `run_schedule.tz` *is* the host zone, the cron times match it directly with **no offset**; don't expect to-the-minute starts (see `references/scheduling.md`).
 - **Slack profiles usually expose email + timezone**, so onboarding *reads* them and only asks in-channel when one is genuinely hidden. (Day one produced zero lunches because the deployed bot asked instead of reading — don't regress that.)
 - **The `lunch-messenger` Slack connector UUID is hardcoded** in its `tools:` allowlist and is workspace-specific; installing in another workspace means swapping it, or the messenger fails closed (the safe direction).
-- **You can't run the whole plugin locally** — it needs the Cowork runtime plus the Slack/Calendar/Drive connectors. Locally you get the Python core (`scripts/test_*.py`) and the dry-run evals; real behavior is exercised in Cowork.
+- **You can't run the whole plugin locally** — it needs the Cowork runtime plus the Slack connector (the only connector now). Locally you get the Python core (`scripts/test_*.py`) and the dry-run evals; real behavior is exercised in Cowork.
 
 ## Keeping things consistent
 

@@ -8,9 +8,10 @@
 // `parallel`, `phase`, `log`, `args`) are injected by the Workflow runtime, and
 // `node`-isms like `Date.now()`/`Math.random()`/`fs` will throw. We need an LLM
 // orchestration because Layer 2/3 are *LLM* evals: each one dry-runs an agent
-// against a stubbed world, then an LLM **judge** grades the output against the
-// eval's `assertions`. (Layer 1 — the deterministic matcher/timezone/scheduling
-// math — stays in `python3 scripts/test_*.py`; this harness never re-tests it.)
+// against a stubbed world (state supplied inline under `setup.state`), then an
+// LLM **judge** grades the output against the eval's `assertions`. (Layer 1 — the
+// deterministic matcher/timezone/scheduling math — stays in
+// `python3 scripts/test_*.py`; this harness never re-tests it.)
 //
 // Invoke from the REPO ROOT, e.g.:
 //
@@ -114,14 +115,14 @@ function producePrompt(e) {
   if (e.target === 'orchestrator') {
     return 'You are simulating the lunch-roulette **orchestrator** (the skill) in a DRY RUN.\n' +
       'First read its runbook: `skills/lunch-roulette/SKILL.md` (skim `skills/lunch-roulette/references/data-schemas.md` for shapes).\n' +
-      'The stubbed world ("setup") provides `now`, the Drive files (config/participants/availability/rounds), and the messenger sync_return:\n' + setup + '\n\nInstruction: ' + e.prompt + '\n\n' +
-      'You MAY run the real Python scripts in `skills/lunch-roulette/scripts/` (to_utc.py/schedule.py/pair.py/record_round.py) on the setup data — they are safe and deterministic. Do NOT call Slack/Calendar/Drive tools — REPORT what you would write/create/post: the availability JSON, the due pool, the groups, the exact create_event call(s) (attendees/optionalAttendee/addGoogleMeetUrl/UTC times/calendarId/summary), and the NOTIFY instructions. Output the produced result as text.'
+      'The stubbed world ("setup") provides `now`, the stored state canvases (config/participants/availability/rounds) under `setup.state`, and the messenger sync_return:\n' + setup + '\n\nInstruction: ' + e.prompt + '\n\n' +
+      'You MAY run the real Python scripts in `skills/lunch-roulette/scripts/` (to_utc.py/schedule.py/pair.py/record_round.py) on the setup data — they are safe and deterministic. Do NOT call Slack tools — REPORT what you would write/post: the availability JSON, the due pool, the groups, the exact Slack match message(s) the messenger would post via NOTIFY (per person: the slot in their own zone, the meeting_link when set, whether an at-slot reminder is scheduled), and the rest of the NOTIFY instructions. There is no calendar event. Output the produced result as text.'
   }
   // integration: chain messenger SYNC -> orchestrator end to end
   return 'You are simulating the lunch-roulette pipeline END-TO-END in a DRY RUN: messenger SYNC -> orchestrator.\n' +
     'Read both specs: `agents/lunch-messenger.md` and `skills/lunch-roulette/SKILL.md`.\n' +
     'The stubbed world ("setup"):\n' + setup + '\n\nInstruction: ' + e.prompt + '\n\n' +
-    'First produce the messenger SYNC return from setup.channel, then feed it + setup.drive + setup.now to the orchestrator and produce the availability written, due pool, groups, create_event call(s), and posted messages. You MAY run the Python scripts (safe). Do NOT call real Slack/Calendar/Drive tools — REPORT. Output the full chain result as text.'
+    'First produce the messenger SYNC return from setup.channel, then feed it + setup.state + setup.now to the orchestrator and produce the availability written, due pool, groups, the Slack match messages posted via NOTIFY (with meeting_link if set and an at-slot reminder when lunch_reminder is on), and any other posted messages. There is no calendar event. You MAY run the Python scripts (safe). Do NOT call real Slack tools — REPORT. Output the full chain result as text.'
 }
 
 function judgePrompt(e, out) {

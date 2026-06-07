@@ -24,9 +24,9 @@ messenger misparsing a time or the orchestrator mis-converting it?).
 - **`messenger.json`** — the `lunch-messenger` subagent. Heavy on parsing and
   injection/abuse, since it is the only thing that ingests coworker text.
 - **`orchestrator.json`** — the `lunch-roulette` skill as the glue: does it call the
-  helpers and use their output, post the right Slack match message (the match
-  message is the invite — there is no calendar event), treat messenger output as
-  data, and follow the guardrails?
+  helpers and use their output, build the right Google Calendar invite **and** post
+  the right Slack match message announcing it, treat messenger output as data, and
+  follow the guardrails?
 
 ## Layer 3 — integration evals (this directory)
 
@@ -52,8 +52,9 @@ Workflow({ scriptPath: "skills/lunch-roulette/evals/harness.workflow.mjs" })
 It **loads** all three eval files into one flat list, then **grades** each eval —
 `produce` (a target-aware dry-run: the messenger reads `agents/lunch-messenger.md`;
 the orchestrator reads `SKILL.md` and *may run the real `scripts/*.py`*; integration
-chains both — always *reporting* what it would do, never touching Slack (no posts and
-no canvas writes)) → `judge` (strict, one verdict per assertion). It returns a table:
+chains both — always *reporting* what it would do, never touching Slack or Calendar
+(no posts, no calendar events, no canvas writes)) → `judge` (strict, one verdict per
+assertion). It returns a table:
 
 - `total` / `passed` — headline count.
 - `failed[]` — `{ id, pass_rate, failed_assertions, summary }` for each miss, so you
@@ -120,9 +121,11 @@ whose entries have the shape:
 ## How to run — dry-run / file-based stubbing
 
 These are **connector-free on purpose**: evals must be deterministic and
-side-effect-free — no real Slack posts or canvas writes. The world is supplied as
-data in `setup`, and the agent is told to **report what it would do instead of doing
-it**.
+side-effect-free — no real Slack posts, calendar events, or canvas writes. The plugin
+itself uses the **Slack** and **Google Calendar** connectors (Slack for the channel
+conversation + the canvas state, Calendar for the lunch invites; no Drive), but the
+evals stub both out: the world is supplied as data in `setup`, and the agent is told
+to **report what it would do instead of doing it**.
 
 - **Messenger evals:** invoke the `lunch-messenger` agent directly (Task /
   `subagent_type: lunch-messenger`) with `setup` rendered into its prompt and the
@@ -132,8 +135,9 @@ it**.
   as the working-dir files (`setup.state` — the stored canvases `config` /
   `participants` / today's `availability` / `rounds`, plus the messenger's SYNC
   return) and the dry-run prompt; grade the artifacts it produces (the availability
-  it would write to the canvas, the groups, and the NOTIFY instructions — the Slack
-  match messages, with `meeting_link` if set and an at-slot reminder when
+  it would write to the canvas, the groups, the `create_event` call(s) for the
+  Google Calendar invites, and the NOTIFY instructions — the Slack match messages
+  announcing the invite, with `meeting_link` if set and an at-slot reminder when
   `lunch_reminder` is on).
 
 Grade `assertions` with an LLM judge or by hand. Run each scenario a few times and

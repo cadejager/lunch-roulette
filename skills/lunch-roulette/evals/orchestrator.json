@@ -1,7 +1,7 @@
 {
   "target": "orchestrator",
   "skill": "lunch-roulette",
-  "note": "Dry-run: materialize `setup.state` as the working-dir files (the stored Slack canvases — config/participants/availability/rounds) and hand the skill `setup.sync_return` as the messenger's SYNC result and `setup.now` as the clock. The skill must NOT call Slack — it reports the availability it would write (overwriting the canvas), the due pool, the groups, and the NOTIFY instructions (the Slack match message is the invite; there is no calendar event). These check the orchestrator uses the helpers and follows the guardrails; the math itself is covered by Layer 1. See README.md.",
+  "note": "Dry-run: materialize `setup.state` as the working-dir files (the stored Slack canvases — config/participants/availability/rounds) and hand the skill `setup.sync_return` as the messenger's SYNC result and `setup.now` as the clock. The skill must NOT call Slack or Calendar — it reports the availability it would write (overwriting the canvas), the due pool, the groups, the create_event call(s) for the Google Calendar invites, and the NOTIFY instructions (the Slack match message announces the calendar invite). These check the orchestrator uses the helpers and follows the guardrails; the math itself is covered by Layer 1. See README.md.",
   "evals": [
     {
       "id": "orch-utc-conversion",
@@ -45,7 +45,7 @@
       "setup": {
         "now": "2026-06-04T12:00:00Z",
         "state": {
-          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
+          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
           "participants": [
             {"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"},
             {"slack_id": "U2", "email": "b@org.com", "timezone": "America/New_York"},
@@ -66,11 +66,11 @@
         },
         "sync_return": {"roster": "unchanged", "today": [], "asked": [], "flagged": []}
       },
-      "prompt": "Run today's pairing for this run (dry-run). Show the due pool, the groups you would form, and the NOTIFY instructions (the Slack match messages and any no-match heads-ups).",
+      "prompt": "Run today's pairing for this run (dry-run). Show the due pool, the groups you would form, the calendar invite(s) you would create, and the NOTIFY instructions (the Slack match messages and any no-match heads-ups).",
       "assertions": [
         "The due pool (from scripts/schedule.py) is exactly U1 and U2 — their 12:30 windows open before the 13:00 next run",
         "U3 and U4 are NOT paired this run — their 19:00 windows are hours away; they are deferred to a later run",
-        "U1 & U2 are paired and each get a Slack match message via NOTIFY (their slot in their own zone); there is no calendar event",
+        "U1 & U2 are paired, a calendar invite is created for them, and each gets a Slack match message via NOTIFY (their slot in their own zone)",
         "No no-match message is sent to U3 or U4 (they are simply waiting, not unmatched)"
       ]
     },
@@ -102,7 +102,7 @@
       "setup": {
         "now": "2026-06-04T16:00:00Z",
         "state": {
-          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
+          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
           "participants": [
             {"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"},
             {"slack_id": "U2", "email": "b@org.com", "timezone": "America/New_York"},
@@ -121,11 +121,11 @@
         },
         "sync_return": {"roster": "unchanged", "today": [], "asked": [], "flagged": []}
       },
-      "prompt": "Run this run (dry-run). It is the last scheduled run of the day. Show the due pool, the groups, and every NOTIFY instruction (matched and unmatched).",
+      "prompt": "Run this run (dry-run). It is the last scheduled run of the day. Show the due pool, the groups, the calendar invite(s), and every NOTIFY instruction (matched and unmatched).",
       "assertions": [
         "The due pool (from scripts/schedule.py) is U1, U2, and U3 — it's the last run, so everyone still active is swept (is_last_run = true)",
         "The matcher pairs U1 & U2 (their 16:00–16:45 windows overlap by ≥30 min); U3 is left unmatched — its 16:50–17:30 window overlaps no one's by ≥30 min",
-        "U1 & U2 each get a Slack match message via NOTIFY (their slot in their own zone); there is no calendar event",
+        "U1 & U2 get a calendar invite and each gets a Slack match message via NOTIFY (their slot in their own zone)",
         "Because it's the last run, should_notify_unmatched is true for U3, so the orchestrator hands U3 to the messenger NOTIFY for a kind 'couldn't line one up today' heads-up — U3 is NOT silently dropped",
         "The no-match decision is made with scripts/schedule.py, not ad hoc",
         "The single NOTIFY dispatch covers BOTH the matched pair (U1 & U2) and the unmatched person (U3)"
@@ -133,21 +133,40 @@
     },
     {
       "id": "orch-match-message-shape",
-      "name": "match message: NOTIFY in each person's own zone + meeting_link + at-slot reminder, no calendar event",
-      "intent": "The match is delivered as a Slack message via the messenger NOTIFY — the slot is converted to each person's own zone, config.meeting_link is included when set, and an at-slot reminder is scheduled when config.lunch_reminder is true. No calendar event is ever created.",
+      "name": "match message: NOTIFY in each person's own zone + meeting_link + at-slot reminder",
+      "intent": "Grades the Slack NOTIFY half of delivery only (the calendar event is created separately in step 8 — see orch-invite-shape). On NOTIFY the slot is converted to each person's own zone, config.meeting_link is included when set, and an at-slot reminder is scheduled when config.lunch_reminder is true.",
       "setup": {
         "now": "2026-06-04T12:00:00Z",
-        "state": {"config": {"timezone": "America/New_York", "meeting_link": "https://example.zoom.us/j/lunchroom", "lunch_reminder": true}},
+        "state": {"config": {"timezone": "America/New_York", "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "https://example.zoom.us/j/lunchroom", "lunch_reminder": true}},
         "group": {"members": [{"email": "alice@org.com", "name": "Alice", "slack_id": "U1", "slack_username": "alice", "timezone": "America/New_York"}, {"email": "bob@org.com", "name": "Bob", "slack_id": "U2", "slack_username": "bob", "timezone": "America/Chicago"}], "slot_utc": {"start": "16:00", "end": "16:30"}}
       },
-      "prompt": "Show the exact NOTIFY instructions you would hand the messenger for this matched group (dry-run, do not actually post). For each person give the partner name(s), the slot in THEIR own timezone, the meeting_link to include, and whether to schedule an at-slot reminder.",
+      "prompt": "This group is already matched and its calendar invite (step 8) has been created — grade ONLY the Slack NOTIFY half here. Show the exact NOTIFY instructions you would hand the messenger for this matched group (dry-run, do not actually post). For each person give the partner name(s), the slot in THEIR own timezone, the meeting_link to include, and whether to schedule an at-slot reminder.",
       "assertions": [
-        "The match is delivered via the messenger NOTIFY (a Slack message) — NOT a calendar event; no create_event / calendar API call appears anywhere",
+        "The match is announced via the messenger NOTIFY (a Slack message); the message announces that the calendar invite is on their calendar (the calendar event itself is created separately in step 8 and is graded by orch-invite-shape, not here)",
         "Alice's NOTIFY shows the slot in America/New_York (16:00Z = 12:00 EDT) and names Bob as her partner",
         "Bob's NOTIFY shows the slot in America/Chicago (16:00Z = 11:00 CDT) and names Alice as his partner — each person sees the slot in their OWN zone (the orchestrator converts slot_utc per person)",
-        "Because config.meeting_link is set, that link (https://example.zoom.us/j/lunchroom) is included in each person's match message",
-        "Because config.lunch_reminder is true, the orchestrator instructs the messenger to schedule an at-slot reminder (slack_schedule_message) for each matched person, at the slot time in that person's zone",
-        "No organizer_email / calendar_id / Google Meet URL is referenced — those fields no longer exist"
+        "Because config.meeting_link is set, that link (https://example.zoom.us/j/lunchroom) is included in each person's match message as a secondary join option",
+        "Because config.lunch_reminder is true, the orchestrator instructs the messenger to schedule an at-slot reminder (slack_schedule_message) for each matched person, at the slot time in that person's zone"
+      ]
+    },
+    {
+      "id": "orch-invite-shape",
+      "name": "calendar invite: idempotency check then Meet + organizer optional + UTC + emails",
+      "intent": "Before creating, the orchestrator lists today's events on config.calendar_id and SKIPS when an event whose member-email set (excluding the organizer) already matches this group exists. When it does create, every create_event has the right shape: real members required, the organizer optional, a Meet attached, UTC times, the configured calendarId, and a summary naming everyone.",
+      "setup": {
+        "now": "2026-06-04T12:00:00Z",
+        "state": {"config": {"organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "timezone": "America/New_York"}},
+        "group": {"members": [{"email": "alice@org.com", "name": "Alice"}, {"email": "bob@org.com", "name": "Bob"}], "slot_utc": {"start": "16:00", "end": "16:30"}},
+        "note": "Storage is Slack canvases; invites are Google Calendar (no Drive). The duplicate-event existence check and the create both run on config.calendar_id."
+      },
+      "prompt": "Create the Google Calendar invite for this matched group (dry-run, do not actually call any tool). First show the idempotency check you would run before creating, then show the exact create_event call you would make.",
+      "assertions": [
+        "Before creating, it runs the idempotency existence check — a list_events on config.calendar_id (bot@org.com) over today's UTC window — and would SKIP creating if an event already exists today whose MEMBER-email set (alice@org.com + bob@org.com, EXCLUDING the organizer config.organizer_email) matches this group",
+        "attendees include alice@org.com and bob@org.com as required (no optional flag)",
+        "attendees also include the organizer (config.organizer_email, bot@org.com) with optionalAttendee: true",
+        "addGoogleMeetUrl is true",
+        "start/end are full ISO-8601 UTC on today's date (e.g. 2026-06-04T16:00:00Z / ...T16:30:00Z)",
+        "calendarId is config.calendar_id (bot@org.com) — the SAME id used for the existence check; summary names both people (e.g. 'Lunch roulette: Alice & Bob')"
       ]
     },
     {
@@ -210,7 +229,7 @@
       "setup": {
         "now": "2026-06-04T12:00:00Z",
         "state": {
-          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
+          "config": {"timezone": "America/New_York", "default_lunch_duration_min": 30, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
           "participants": [{"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"}, {"slack_id": "U2", "email": "b@org.com", "timezone": "America/New_York"}],
           "availability_today": {"date": "2026-06-04", "responses": [{"slack_id": "U1", "email": "a@org.com", "free_utc": [["12:30", "13:00"]]}, {"slack_id": "U2", "email": "b@org.com", "free_utc": [["12:30", "13:00"]]}], "paired": []},
           "rounds": []
@@ -219,8 +238,8 @@
       },
       "prompt": "Run today's pairing (dry-run). Note: there are no prior rounds — this is the team's first run.",
       "assertions": [
-        "It recognizes this as the first run (history/rounds empty) and presents the proposed group and match messages to the organizer for approval",
-        "It does NOT post the match (NOTIFY) or schedule any reminder before approval",
+        "It recognizes this as the first run (history/rounds empty) and presents the proposed group, calendar invite, and match messages to the organizer for approval",
+        "It does NOT create the calendar event, post the match (NOTIFY), or schedule any reminder before approval",
         "Once approved it would proceed normally"
       ]
     },
@@ -230,12 +249,13 @@
       "intent": "First-time setup is the one place the orchestrator touches Slack directly; it creates the intake channel and seeds config. State lives in Slack canvases created on first write — there is nothing to pre-create and no roster to seed.",
       "setup": {
         "command": "/lunch setup",
-        "host_answers": {"workspace": "confirmed", "channel": "create new #lunch-roulette", "timezone": "America/New_York", "state_namespace": "lunchroulette-state", "meeting_link": "https://example.zoom.us/j/lunchroom"}
+        "host_answers": {"workspace": "confirmed", "channel": "create new #lunch-roulette", "timezone": "America/New_York", "state_namespace": "lunchroulette-state", "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "https://example.zoom.us/j/lunchroom"}
       },
       "prompt": "Walk first-time setup (dry-run). List every side-effecting action you would take, in order.",
       "assertions": [
         "It creates the intake channel itself via slack_create_conversation (its one direct Slack call) — not via the messenger",
         "It records the new channel id as config.channel_id and seeds config.json from assets/config.example.json with the host's values (timezone + run_schedule.tz from the host zone, and the meeting_link if given)",
+        "It captures the host's organizer_email and calendar_id into config.json (the account that owns and sends the Google Calendar invites)",
         "It does NOT pre-create any state canvas (config/participants/availability/rounds are created on first write) and does not invent a roster — the participants canvas fills itself from channel membership on the first run",
         "It plans a dry-run first real run before anything reaches the team",
         "Each side-effect is confirmed with the host before doing it"

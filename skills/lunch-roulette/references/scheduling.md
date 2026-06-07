@@ -72,9 +72,10 @@ orchestrator reads the current config from its Slack canvas at run time, so the
 channel, timezone, window, and schedule all live in one place and can't drift.)
 Create this task **only after the plugin install is confirmed** — a schedule made
 before the plugin is registered fires background sessions with no skill/messenger and
-can't pair. Make sure the scheduled session has the **Slack** connector available —
-that's the only one needed now: the orchestrator stores all state in Slack canvases,
-and the `lunch-messenger` it spawns needs Slack too.
+can't pair. Make sure the scheduled session has the **Slack and Google Calendar**
+connectors available (no Drive): the orchestrator stores all state in Slack canvases
+and creates the lunch invites on Google Calendar, and the `lunch-messenger` it spawns
+needs Slack too.
 
 ## Running more than one team at once
 

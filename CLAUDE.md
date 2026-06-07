@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`lunch-roulette` is a **Claude Cowork plugin** (not a standalone app): a daily bot that pairs remote teammates for lunch over **Slack only** (no Google dependencies). The repository root *is* the plugin — `.claude-plugin/plugin.json` sits at the top, alongside `agents/`, `commands/`, and `skills/`.
+`lunch-roulette` is a **Claude Cowork plugin** (not a standalone app): a daily bot that pairs remote teammates for lunch over **Slack + Google Calendar** — durable state in Slack canvases, invites via Google Calendar; **no Google Drive**. The repository root *is* the plugin — `.claude-plugin/plugin.json` sits at the top, alongside `agents/`, `commands/`, and `skills/`.
 
 Most of the "logic" is **prose that an LLM executes**, not traditional code:
 - `skills/lunch-roulette/SKILL.md` — the **orchestrator** (the trusted brain).
@@ -38,7 +38,7 @@ python3 pair.py --availability avail.json --history history.json --out groups.js
 
 **Package the plugin** as an installable `.plugin` (a zip with `.claude-plugin/plugin.json` at the *archive root* — the repo root **is** the plugin root, so use **no** `--prefix`). Run from the repo root; `*.plugin` is gitignored; match the version in `plugin.json`. See [`BUILD.md`](BUILD.md) for the full release flow and how to verify the archive:
 ```bash
-git archive --format=zip -o lunch-roulette-v0.4.1s.plugin HEAD
+git archive --format=zip -o lunch-roulette-v0.5.0.plugin HEAD
 ```
 
 ## Architecture — the big picture
@@ -59,7 +59,7 @@ When changing behavior, update the script **and** its test **and** the matching 
 
 **4. Slack-canvas storage (overwrite-in-place).** All state (config, participants, availability, history rounds) lives in **Slack canvases** — one canvas per logical file, holding one JSON doc. Unlike the old Google Drive store, a canvas **can** be overwritten, so each file is a single canvas rewritten whole on each change (`slack_update_canvas` with `action="replace"`) and located on a cold session by a stable **sentinel** search (`"<ns>::<file>"`, where `<ns>` is `config.state_namespace`, default `lunchroulette-state`). This drops the old append-only / versioned-filename / newest-wins model entirely. Canvases live server-side in the Slack workspace, so state survives the ephemeral Cowork host, a session replacement, and a plugin update. (A canvas still **can't** be deleted — same as Drive — but because we overwrite in place there are no stale versions to clean up.) Layout, sentinels, and the full messenger↔orchestrator data contract are in `references/data-schemas.md`.
 
-**5. The match message is the invite.** There is no Google Calendar event and no auto-generated Meet link: the messenger's in-channel Slack match message *is* the invite. An optional `config.meeting_link` (a static Zoom/Meet personal-room URL) is included in each match message when set; otherwise pairs grab a Slack huddle. An optional `config.lunch_reminder` (default true) has the messenger schedule a short at-slot nudge via `slack_schedule_message`. The `notified_matched` availability ledger is the retry guard that replaces the old "list today's calendar events and skip duplicates" check.
+**5. Calendar invite + Slack announcement.** Each match is delivered two ways: the orchestrator creates **one Google Calendar event per group** (structured `attendees` = the members' emails, with `config.organizer_email` added as an *optional* attendee, `addGoogleMeetUrl: true`, UTC start/end), and the messenger posts an in-channel Slack message **announcing** that invite. The orchestrator owns the calendar create (a trusted action); the messenger only announces. **Three retry guards, one per side effect, keep a crash/retry from doubling up:** (a) a **live event-existence check** (`list_events` on `config.calendar_id`, matched on the group's *member*-email set, excluding the ever-present organizer) guards duplicate **calendar events**; (b) the `notified_matched` availability ledger guards duplicate **Slack messages**; (c) the `paired` ledger guards **re-pairing** on a later run. An optional `config.meeting_link` (a static Zoom/Meet personal-room URL) is included in the Slack message as a *secondary*/pinned room when set — the invite's Meet is the primary join link. An optional `config.lunch_reminder` (default true) has the messenger schedule a short at-slot nudge via `slack_schedule_message`.
 
 **6. Just-in-time hourly pairing.** A scheduled run fires hourly across the team's morning (`config.run_schedule`). Every run does the *same* job — sync the channel, then pair only the people whose lunch is "due" before the **next** run; everyone else waits for a later run. Someone is told "no match" only when it's hopeless (the last run, or all their windows pass by the next run). There is **no separate collect/pair phase**. The two entry points (`commands/lunch.md`) are `/lunch setup` (first-time) and `/lunch run` / blank (the hourly job).
 
@@ -71,7 +71,7 @@ Hard-won context from running this in Cowork — you can't infer these from the 
 - **Cron fires in the host machine's local timezone, with ~10 min jitter** — not a per-task configurable zone. Because `run_schedule.tz` *is* the host zone, the cron times match it directly with **no offset**; don't expect to-the-minute starts (see `references/scheduling.md`).
 - **Slack profiles usually expose email + timezone**, so onboarding *reads* them and only asks in-channel when one is genuinely hidden. (Day one produced zero lunches because the deployed bot asked instead of reading — don't regress that.)
 - **The `lunch-messenger` Slack connector UUID is hardcoded** in its `tools:` allowlist and is workspace-specific; installing in another workspace means swapping it, or the messenger fails closed (the safe direction).
-- **You can't run the whole plugin locally** — it needs the Cowork runtime plus the Slack connector (the only connector now). Locally you get the Python core (`scripts/test_*.py`) and the dry-run evals; real behavior is exercised in Cowork.
+- **You can't run the whole plugin locally** — it needs the Cowork runtime plus the Slack **and** Google Calendar connectors. Locally you get the Python core (`scripts/test_*.py`) and the dry-run evals; real behavior is exercised in Cowork.
 
 ## Keeping things consistent
 

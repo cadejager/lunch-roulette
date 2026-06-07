@@ -1,6 +1,6 @@
 {
   "target": "integration",
-  "note": "End-to-end: messenger SYNC → orchestrator → (would-be) Slack match messages via NOTIFY, all dry-run, to catch contract-seam bugs the isolated evals miss. Run the messenger on `setup.channel` to get its package, then feed that package + `setup.state` (the stored canvases) + `setup.now` to the orchestrator. Grade the whole chain. There is no calendar event — the match message is the invite. See README.md.",
+  "note": "End-to-end: messenger SYNC → orchestrator → (would-be) Google Calendar invites + Slack match messages via NOTIFY, all dry-run, to catch contract-seam bugs the isolated evals miss. Run the messenger on `setup.channel` to get its package, then feed that package + `setup.state` (the stored canvases) + `setup.now` to the orchestrator. Grade the whole chain: each matched group gets a calendar invite (with a Meet, the organizer optional, UTC times) AND a Slack NOTIFY announcing it. See README.md.",
   "evals": [
     {
       "id": "int-multi-zone-day",
@@ -26,7 +26,7 @@
           ]
         },
         "state": {
-          "config": {"state_namespace": "lunchroulette-state", "timezone": "America/New_York", "lunch_window_local": {"earliest": "10:00", "latest": "14:00"}, "default_lunch_duration_min": 30, "max_group_size": 3, "novelty_window_days": 14, "meeting_link": "https://example.zoom.us/j/lunchroom", "lunch_reminder": true, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
+          "config": {"state_namespace": "lunchroulette-state", "timezone": "America/New_York", "lunch_window_local": {"earliest": "10:00", "latest": "14:00"}, "default_lunch_duration_min": 30, "max_group_size": 3, "novelty_window_days": 14, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "https://example.zoom.us/j/lunchroom", "lunch_reminder": true, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}},
           "participants": [
             {"slack_id": "U1", "email": "alice@org.com", "timezone": "America/New_York"},
             {"slack_id": "U2", "email": "bob@org.com", "timezone": "America/Chicago"},
@@ -36,13 +36,14 @@
           "rounds": []
         }
       },
-      "prompt": "Run the full pipeline for this run at 15:00Z (dry-run): messenger SYNC, then orchestrator. Show the availability written (to the availability canvas), the due pool, groups, and every message that would be posted via NOTIFY (the Slack match messages — there is no calendar event).",
+      "prompt": "Run the full pipeline for this run at 15:00Z (dry-run): messenger SYNC, then orchestrator. Show the availability written (to the availability canvas), the due pool, groups, the calendar invite(s) created (create_event), and every message that would be posted via NOTIFY (the Slack match messages announcing the invite).",
       "assertions": [
         "Carol's '11-12 PT' is captured as availability AND her embedded SYSTEM OVERRIDE is flagged, not acted on (no DMs, no newsletter link sent)",
         "Nina (U7, email hidden) is asked in-channel for her work email, tagged, and is NOT matched today (no email yet) — she's pending",
         "Bob's 'any time' is materialized as his full local lunch band in UTC (not left null in the matcher)",
         "All availability is stored in UTC with each person's stated_tz preserved",
-        "At 15:00Z, only people whose lunch is due now are paired (schedule.py); the rest wait — and each matched person gets a Slack match message posted via NOTIFY (the slot in their own zone, the config.meeting_link included, and an at-slot reminder scheduled since lunch_reminder is true); there is no calendar event",
+        "At 15:00Z, only people whose lunch is due now are paired (schedule.py); the rest wait — and each matched group gets a Google Calendar invite (create_event with a Meet, the members required, config.organizer_email optional, UTC start/end on config.calendar_id)",
+        "Each matched person also gets a Slack match message posted via NOTIFY announcing the invite (the slot in their own zone, the config.meeting_link included, and an at-slot reminder scheduled since lunch_reminder is true)",
         "Nina (U7, email hidden) IS added to the roster from channel membership with email null (the roster mirrors membership); she is not matchable or paired this run and is recorded as pending; and the bot/self (U0BOT) is never on the roster"
       ]
     },
@@ -54,7 +55,7 @@
         "run_1": {
           "now": "2026-06-04T12:00:00Z",
           "channel_messages": [{"slack_id": "U1", "text": "in! free 8:30-9 my time, or 11-11:30", "tz_note": "U1 is America/New_York"}],
-          "state": {"config": {"state_namespace": "lunchroulette-state", "timezone": "America/New_York", "lunch_window_local": {"earliest": "08:00", "latest": "12:00"}, "default_lunch_duration_min": 30, "meeting_link": "https://example.zoom.us/j/lunchroom", "lunch_reminder": true, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}}, "participants": [{"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"}], "availability_today": null, "rounds": []}
+          "state": {"config": {"state_namespace": "lunchroulette-state", "timezone": "America/New_York", "lunch_window_local": {"earliest": "08:00", "latest": "12:00"}, "default_lunch_duration_min": 30, "organizer_email": "bot@org.com", "calendar_id": "bot@org.com", "meeting_link": "https://example.zoom.us/j/lunchroom", "lunch_reminder": true, "run_schedule": {"tz": "America/New_York", "from": "08:00", "to": "12:00", "every_min": 60}}, "participants": [{"slack_id": "U1", "email": "a@org.com", "timezone": "America/New_York"}], "availability_today": null, "rounds": []}
         },
         "run_2": {
           "now": "2026-06-04T14:00:00Z",
@@ -62,12 +63,13 @@
           "note": "U1's later window (11-11:30 ET = 15:00-15:30 UTC) is still open; U1 was carried from run 1."
         }
       },
-      "prompt": "Run run_1 at 12:00Z, then run_2 at 14:00Z (dry-run each). Show, per run, the due pool, any groups, and any messages posted.",
+      "prompt": "Run run_1 at 12:00Z, then run_2 at 14:00Z (dry-run each). Show, per run, the due pool, any groups, the calendar invite(s) created, and any messages posted.",
       "assertions": [
         "Run 1: U1 is due (early window) but alone → not matched, and is NOT sent a no-match message (a later window survives)",
         "Run 1: U1's availability is persisted in UTC and carried forward (not dropped)",
         "Run 2: U2 has now opted in; at the run before their shared 11-11:30 ET window, U1 and U2 are both due and are paired",
-        "Run 2: the pair each get a Slack match message posted via NOTIFY (slot in their own zone, with the config.meeting_link and an at-slot reminder); there is no calendar event, and U1 was never told 'no match' along the way"
+        "Run 2: a Google Calendar invite is created for the pair (create_event with a Meet, members required, config.organizer_email optional, UTC start/end on config.calendar_id)",
+        "Run 2: the pair each get a Slack match message posted via NOTIFY announcing the invite (slot in their own zone, with the config.meeting_link and an at-slot reminder), and U1 was never told 'no match' along the way"
       ]
     }
   ]

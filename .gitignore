@@ -2,7 +2,10 @@
 __pycache__/
 *.pyc
 
-# Build artifacts (the plugin zip is generated from the source tree)
+# Build artifacts — the installable bundle is generated from the source tree.
+# A .plugin is a zip with the manifest at the archive root (see BUILD.md);
+# *.zip covers older builds and any intermediate archive.
+*.plugin
 *.zip
 
 # Local scratch / working dirs — never committed.

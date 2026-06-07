@@ -34,6 +34,7 @@ git archive --format=zip -o lunch-roulette-v0.5.0.plugin HEAD
 Why `git archive` (and **no** `--prefix`):
 
 - It packs **tracked files only** at the committed state — no `.git`, no `__pycache__`, no `_*/` scratch dirs, no local cruft. (The skill's `_work/` runtime dir and other `_*/` dirs are gitignored, so they're excluded automatically.)
+- **Dev-only files are excluded via `.gitattributes` `export-ignore`** (`CLAUDE.md`, `BUILD.md`). This is **required**: Claude Desktop's plugin validator runs in **strict** mode (warnings = errors), and a `CLAUDE.md` at the plugin root is a warning that becomes a hard *"Plugin validation failed"* (it blocked the v0.5.0 upload). `git archive` honors `export-ignore`, so the build command above stays exactly the same and the output is clean. **Verify** after building that `CLAUDE.md` is **not** in the archive (see below).
 - `--format=zip` makes a real zip; renaming the output to `.plugin` is all Cowork needs.
 - Omitting `--prefix` keeps `.claude-plugin/` at the archive root. Adding `--prefix=lunch-roulette/` would bury the manifest one level down (`lunch-roulette/.claude-plugin/plugin.json`) and Cowork would not see an installable plugin — that was the old, broken build.
 

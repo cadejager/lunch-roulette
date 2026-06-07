@@ -1,0 +1,12 @@
+# Keep dev-only repo files OUT of the packaged `.plugin`. `git archive` honors
+# `export-ignore`, so the standard build command (see BUILD.md) produces a clean,
+# installable plugin with no extra steps.
+#
+# Why: Claude Desktop's plugin validator runs in STRICT mode (warnings = errors). A
+# `CLAUDE.md` at the plugin root raises a warning ("not loaded as project context"),
+# and strict mode turns that into a hard "Plugin validation failed" — which blocked
+# the v0.5.0 upload. These files are developer docs for the source repo and are never
+# loaded at runtime, so excluding them from the package costs nothing functionally.
+CLAUDE.md      export-ignore
+BUILD.md       export-ignore
+.gitattributes export-ignore

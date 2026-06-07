@@ -1,7 +1,7 @@
 {
   "name": "lunch-roulette",
-  "version": "0.4.1",
-  "description": "Daily lunch roulette for remote teams: invites people in a Slack channel, learns who's free today and when, pairs them into twos (or a three when odd) while rotating day to day, and sends Google Calendar invites with a Google Meet. A trusted orchestrator skill does the matching, timezone math (UTC), and calendar/Drive writes; a tool-locked lunch-messenger subagent (Sonnet) handles all Slack conversation with coworkers.",
+  "version": "0.5.0",
+  "description": "Daily lunch roulette for remote teams: invites people in a Slack channel, learns who's free today and when, pairs them into twos (or a three when odd) while rotating day to day, and sends Google Calendar invites with a Google Meet plus a Slack match notification. Durable state lives in Slack canvases (no Google Drive). A trusted orchestrator skill does the matching, timezone math (UTC), and calendar writes; a tool-locked lunch-messenger subagent (Sonnet) handles all Slack conversation with coworkers.",
   "license": "AGPL-3.0-or-later",
   "homepage": "https://github.com/cadejager/lunch-roulette",
   "author": {
@@ -16,6 +16,7 @@
     "team",
     "slack",
     "google calendar",
+    "remote work",
     "scheduling"
   ]
 }

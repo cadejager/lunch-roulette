@@ -7,7 +7,8 @@ a task. One emoji is plenty; vary the wording so it never reads like a robot. Ev
 message is posted **in the intake channel**, tagging the person with `<@id>` at the
 start, threaded under their own message when replying to one.
 
-The one thing the **orchestrator** writes is the calendar invite text (last section).
+The one thing the **orchestrator** writes is the calendar invite text (last section);
+the messenger composes everything that's posted in Slack.
 
 ## Daily call-to-action (once per day, first run)
 
@@ -27,18 +28,19 @@ missing:
 
 (If timezone is what's missing instead: ask for the timezone they're usually in.)
 
-## Match notification (in-channel, per person)
+## Match notification (in-channel, per person) — announces the calendar invite
 
 Tag the person; show the time **in their own zone** (the orchestrator provides it);
-mention the Meet/invite:
+point at the calendar invite + Meet, and add the optional `meeting_link` as a
+secondary room only if the orchestrator gave you one:
 
 > <@U…> you're matched with **Dana** for lunch at **12:30** today 🥪 Invite + Meet
 > link are on your calendar — enjoy!
 
 For a three:
 
-> <@U…> today you're a lunch trio with **Sam** and **Dana** at **1:00** 🥗 Check
-> your calendar for the invite!
+> <@U…> today you're a lunch trio with **Sam** and **Dana** at **1:00** 🥗 Check your
+> calendar for the invite!
 
 ## Unmatched heads-up (couldn't place someone today)
 
@@ -53,6 +55,16 @@ just misunderstood:
 
 > <@U…> I'm just the lunch bot — I only help match folks for lunch! 🙂 Want in
 > today? Drop a rough time you're free.
+
+## At-slot reminder (optional — scheduled with `slack_schedule_message`)
+
+When `config.lunch_reminder` is on, the messenger also schedules a short nudge that
+fires **in the channel at the lunch time**, tagging the matched person:
+
+> <@U…> lunch with **Dana** is starting now 🥪 — hop in!
+
+One per matched person, scheduled at their slot (skip the unmatched). Same voice
+rules: warm, short, one emoji, posted only in the intake channel.
 
 ## Calendar invite (written by the orchestrator)
 

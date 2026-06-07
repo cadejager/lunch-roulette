@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Chris DeJager
-"""Write an **append-only** lunch round file.
+"""Merge a lunch round (one day's groups).
 
-Drive can't overwrite or delete, so history is kept as one immutable file per
-(date, run): ``rounds/round-<DATE>-<ts>.json``. The newest file for a date is the
-complete record of that day. Because pairing happens incrementally across the
-day's runs (each run pairs whoever's lunch is imminent), every run merges the
-day's groups so far with the groups it just formed and writes a fresh file.
-Reading the newest file back always gives the full day; re-running is safe.
-
-Each round file is simply:
+Pairing happens incrementally across a day's runs (each run pairs whoever's lunch is
+imminent), so every run merges the day's groups so far with the groups it just formed.
+This merges a single day's round object —
     {"date": "2026-06-04", "groups": [["a@x","b@x"], ["c@x","d@x","e@x"]]}
+— de-duping by membership set so a retried run can't double-record a group.
 
-The matcher reads the *aggregate* of these (one newest file per past date, within
-the novelty window) as its --history; that aggregation is the orchestrator's job.
+State lives in a Slack canvas: the orchestrator keeps one ``rounds`` doc holding
+``{"rounds": [{"date", "groups"}]}``, extracts today's entry, runs this merge, splices
+the result back into that list, and prunes to the novelty window. The matcher reads the
+whole ``{"rounds": [...]}`` as its --history.
 
 Usage:
     python record_round.py --groups groups-this-run.json \
-        [--into rounds/round-2026-06-04-T1500.json] \
-        --out rounds/round-2026-06-04-T1600.json
+        [--into round-today.json] [--date 2026-06-04] \
+        --out round-merged.json
 """
 
 import argparse

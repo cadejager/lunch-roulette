@@ -28,7 +28,7 @@ Because the repo root already is the plugin root, a no-prefix `git archive` prod
 Run from the **repo root**. The version in the filename should match `version` in `.claude-plugin/plugin.json`:
 
 ```bash
-git archive --format=zip -o lunch-roulette-v0.5.0.plugin HEAD
+git archive --format=zip -o lunch-roulette-v0.4.1s.plugin HEAD
 ```
 
 Why `git archive` (and **no** `--prefix`):
@@ -46,15 +46,15 @@ This is the reproducible equivalent of zipping the plugin directory's *contents*
 Confirm the manifest is at the root and the expected files are present:
 
 ```bash
-unzip -l lunch-roulette-v0.5.0.plugin | grep -E 'claude-plugin|SKILL.md|lunch-messenger|lunch.md|LICENSE'
+unzip -l lunch-roulette-v0.4.1s.plugin | grep -E 'claude-plugin|SKILL.md|lunch-messenger|lunch.md|LICENSE'
 ```
 
-You want `.claude-plugin/plugin.json` listed at the **top level** (not under `lunch-roulette/...`), plus `agents/lunch-messenger.md`, `commands/lunch.md`, `skills/lunch-roulette/SKILL.md`, and `LICENSE`. Spot-check the full listing with `unzip -l lunch-roulette-v0.5.0.plugin` if anything looks off.
+You want `.claude-plugin/plugin.json` listed at the **top level** (not under `lunch-roulette/...`), plus `agents/lunch-messenger.md`, `commands/lunch.md`, `skills/lunch-roulette/SKILL.md`, and `LICENSE`. Spot-check the full listing with `unzip -l lunch-roulette-v0.4.1s.plugin` if anything looks off.
 
 A quick sanity check that nothing scratch leaked in:
 
 ```bash
-unzip -l lunch-roulette-v0.5.0.plugin | grep -E '__pycache__|/_|\.git/' || echo "clean"
+unzip -l lunch-roulette-v0.4.1s.plugin | grep -E '__pycache__|/_|\.git/' || echo "clean"
 ```
 
 ## How Cowork installs it
@@ -68,19 +68,19 @@ A `.plugin` becomes installable when it lands in a Cowork **session's outputs di
 1. **Bump the version.** Edit `version` in `.claude-plugin/plugin.json`, and update the version references in `README.md` (the **Status** line and the `## Building` command) and `CLAUDE.md` (the *Package the plugin* command). Merge that via PR (`main` is branch-protected).
 2. **Tag the release** on the merged commit:
    ```bash
-   git tag v0.5.0
-   git push origin v0.5.0
+   git tag v0.4.1s
+   git push origin v0.4.1s
    ```
 3. **Build the artifact** from the tag (clean checkout recommended):
    ```bash
-   git archive --format=zip -o lunch-roulette-v0.5.0.plugin v0.5.0
+   git archive --format=zip -o lunch-roulette-v0.4.1s.plugin v0.4.1s
    ```
-4. **Verify** it (see above), then **attach the `.plugin` to a GitHub Release** for `v0.5.0`:
+4. **Verify** it (see above), then **attach the `.plugin` to a GitHub Release** for `v0.4.1s`:
    ```bash
-   gh release create v0.5.0 lunch-roulette-v0.5.0.plugin \
-     --title "v0.5.0" --notes "..."
+   gh release create v0.4.1s lunch-roulette-v0.4.1s.plugin \
+     --title "v0.4.1s" --notes "..."
    # or, on an existing release:
-   gh release upload v0.5.0 lunch-roulette-v0.5.0.plugin
+   gh release upload v0.4.1s lunch-roulette-v0.4.1s.plugin
    ```
 
 Keep the filename version, the git tag, and `plugin.json`'s `version` in lockstep.

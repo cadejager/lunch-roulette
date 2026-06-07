@@ -38,7 +38,7 @@ python3 pair.py --availability avail.json --history history.json --out groups.js
 
 **Package the plugin** as an installable `.plugin` (a zip with `.claude-plugin/plugin.json` at the *archive root* — the repo root **is** the plugin root, so use **no** `--prefix`). Run from the repo root; `*.plugin` is gitignored; match the version in `plugin.json`. See [`BUILD.md`](BUILD.md) for the full release flow and how to verify the archive:
 ```bash
-git archive --format=zip -o lunch-roulette-v0.5.0.plugin HEAD
+git archive --format=zip -o lunch-roulette-v0.4.1s.plugin HEAD
 ```
 
 ## Architecture — the big picture

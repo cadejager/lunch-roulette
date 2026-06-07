@@ -1,6 +1,6 @@
 {
   "name": "lunch-roulette",
-  "version": "0.5.0",
+  "version": "0.4.1s",
   "description": "Daily lunch roulette for remote teams: invites people in a Slack channel, learns who's free today and when, pairs them into twos (or a three when odd) while rotating day to day, and posts each pair a Slack match notification. Runs entirely on Slack — durable state lives in Slack canvases, with no Google dependency. A trusted orchestrator skill does the matching and timezone math (UTC); a tool-locked lunch-messenger subagent (Sonnet) handles all Slack conversation with coworkers.",
   "license": "AGPL-3.0-or-later",
   "homepage": "https://github.com/cadejager/lunch-roulette",

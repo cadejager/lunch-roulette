@@ -7,8 +7,8 @@ a task. One emoji is plenty; vary the wording so it never reads like a robot. Ev
 message is posted **in the intake channel**, tagging the person with `<@id>` at the
 start, threaded under their own message when replying to one.
 
-The **orchestrator** no longer writes any invite text — there's no calendar event;
-the match is delivered entirely as the messenger's Slack message below.
+The one thing the **orchestrator** writes is the calendar invite text (last section);
+the messenger composes everything that's posted in Slack.
 
 ## Daily call-to-action (once per day, first run)
 
@@ -23,24 +23,24 @@ Posted to the channel with `@here`. All it needs is the hashtag plus a short, fu
 Only when their Slack profile didn't supply it. Tag them, ask for *only* what's
 missing:
 
-> Hey <@U…> — want to get you into today's lunch! I just need your **work email** to
-> add you to the matching. Drop it here? 🙂
+> Hey <@U…> — want to get you into today's lunch! I just need your **work email**
+> (the one on your Google Calendar) so I can send the invite. Drop it here? 🙂
 
 (If timezone is what's missing instead: ask for the timezone they're usually in.)
 
-## Match notification (in-channel, per person) — this IS the invite
+## Match notification (in-channel, per person) — announces the calendar invite
 
 Tag the person; show the time **in their own zone** (the orchestrator provides it);
-include the `meeting_link` if the orchestrator gave you one (else the pair just grabs
-a Slack huddle):
+point at the calendar invite + Meet, and add the optional `meeting_link` as a
+secondary room only if the orchestrator gave you one:
 
-> <@U…> you're matched with **Dana** for lunch at **12:30** today 🥪 — see you then!
-> (Join: <link> — or grab a huddle right here.)
+> <@U…> you're matched with **Dana** for lunch at **12:30** today 🥪 Invite + Meet
+> link are on your calendar — enjoy!
 
 For a three:
 
-> <@U…> today you're a lunch trio with **Sam** and **Dana** at **1:00** 🥗 — see you
-> then!
+> <@U…> today you're a lunch trio with **Sam** and **Dana** at **1:00** 🥗 Check your
+> calendar for the invite!
 
 ## Unmatched heads-up (couldn't place someone today)
 
@@ -65,3 +65,19 @@ fires **in the channel at the lunch time**, tagging the matched person:
 
 One per matched person, scheduled at their slot (skip the unmatched). Same voice
 rules: warm, short, one emoji, posted only in the intake channel.
+
+## Calendar invite (written by the orchestrator)
+
+- **Summary:** `Lunch roulette: {name_a} & {name_b}` (or `{a}, {b} & {c}`).
+- **Description:**
+
+  > You've been matched for lunch through the team's lunch roulette 🍽️ Use this time
+  > to step away and get to know each other — no agenda. A Google Meet is attached if
+  > you're remote. If the time doesn't work, reply here and reschedule between
+  > yourselves.
+
+- Always attach a Google Meet (`addGoogleMeetUrl: true`) and add the bot
+  (`organizer_email`) as an **optional** attendee.
+- `create_event` returns the created event, so confirm from **that response** that the
+  Meet link is attached and the organizer landed as `optionalAttendee: true` (not
+  required) — catching a malformed event rather than shipping it. No second read-back.

@@ -53,8 +53,8 @@ place there are no stale versions to clean up; a one-off retired artifact can be
 removed by a human in the Slack UI.
 
 **Trust placement.** Canvas reads and writes are the **orchestrator's** job — the
-trusted side that makes every decision — exactly as the Drive/Calendar writes used
-to be. The `lunch-messenger` has **no** canvas tools and never touches state; it
+trusted side that makes every decision — as are the Google Calendar invites. The
+`lunch-messenger` has **no** canvas tools and never touches state; it
 only ever reads the channel and posts in it. (Search is eventually consistent: a
 just-written canvas may take a few seconds to appear in search — on a cold start,
 retry the search before concluding it's missing.)
@@ -71,6 +71,8 @@ retry the search before concluding it's missing.)
   "default_lunch_duration_min": 30,
   "max_group_size": 3,
   "novelty_window_days": 14,
+  "organizer_email": "you@org.com",
+  "calendar_id": "primary",
   "meeting_link": "",
   "lunch_reminder": true,
   "run_schedule": { "tz": "America/New_York", "from": "07:40", "to": "11:40", "every_min": 60 }
@@ -95,11 +97,14 @@ retry the search before concluding it's missing.)
   recent shared lunches weigh more. Also how far back the `rounds` canvas is kept.
 - **max_group_size** — keep at 3; the matcher only makes a three when the count is
   odd.
-- **meeting_link** — *optional* video-call URL (e.g. a Zoom or Meet personal-room
-  link) that is included in each match message. Empty = no link, and the pair just
-  grabs a Slack huddle in the channel. There is **no auto-generated** meeting link:
-  the Slack connector cannot create a call/huddle/Meet, so this static link is the
-  only way to put a join URL in front of people.
+- **organizer_email / calendar_id** — the account that owns and sends the Google
+  Calendar invites. The orchestrator creates each event on `calendar_id` (and runs the
+  duplicate-event existence check on that same `calendar_id`), adding `organizer_email`
+  as an **optional** attendee.
+- **meeting_link** — *optional* pinned/fallback video-call URL (e.g. a Zoom or Meet
+  personal-room link) added to the Slack match message. The calendar invite's **Google
+  Meet is the primary join link**, so leave this empty unless you want a fixed room;
+  when set, it's included in the message as a secondary option.
 - **lunch_reminder** — *optional*, default `true`. When true, in addition to the
   match notification the messenger schedules a short Slack nudge **at the lunch
   slot** via `slack_schedule_message`. Set false for teams that find it noisy.
@@ -114,11 +119,10 @@ retry the search before concluding it's missing.)
   e.g. cron jitter or an over-broad cron — instead of treating it as the last run.
   See references/scheduling.md.
 
-> **No Google fields.** `drive_folder`, `organizer_email`, and `calendar_id` are
-> gone: state is in Slack canvases and matches are posted in Slack, so there is no
-> Drive folder and no Google Calendar invite. (If a calendar connector is ever
-> added back, reintroduce `organizer_email` + `calendar_id` and the create-event
-> step alongside it.)
+> **Storage is Slack, invites are Google Calendar — no Drive.** There is no
+> `drive_folder`: durable state lives in Slack canvases (above). `organizer_email` and
+> `calendar_id` drive the Google Calendar invites (the orchestrator's create-event step
+> in SKILL.md); the Slack match message announces them.
 
 ## participants.json (the roster)
 
@@ -140,10 +144,11 @@ retry the search before concluding it's missing.)
 - The roster mirrors the intake **channel's membership** — the `lunch-messenger`
   reconciles it every run (adds new members, drops people who left) and fills
   `email` + `timezone` from each person's Slack profile.
-- **slack_id** is the stable identity; **email** is the **match/history key** —
-  `pair.py` and the round history identify a person by email, so it's required
-  before a person can be matched; **timezone** is their home zone, used to read bare
-  times and to display match times back to them.
+- **slack_id** is the stable identity; **email** is the **match/history key AND the
+  calendar invite address** — `pair.py` and the round history identify a person by
+  email, and the calendar event invites them at it, so it's required before a person
+  can be matched; **timezone** is their home zone, used to read bare times and to
+  display match times back to them.
 - `email` and/or `timezone` may be **null** when a profile hasn't provided them —
   that person isn't matchable until both exist, and the messenger asks them
   (in-channel, once a day) for what's missing.
@@ -203,9 +208,10 @@ into UTC and clipped them to that person's local lunch window.
   (pairing is incremental across the day; nobody is matched twice).
 - **notified_matched** — an append-only ledger of slack_ids already sent their
   **match** notification today. Carried forward each run like `paired`, so a retried
-  run never double-posts a match. This (together with `paired`) is the retry guard
-  that the old "list today's calendar events and skip duplicates" check used to
-  provide — there is no calendar to list anymore.
+  run never double-posts a match. It guards the **Slack message**; the duplicate
+  **calendar event** is guarded separately by the live event-existence check (SKILL.md
+  step 8). With `paired` (which stops re-pairing on a later run), these are the three
+  retry guards.
 - **notified_unmatched** — an append-only ledger of slack_ids already sent a "no
   match" heads-up today. Carried forward each run like `paired`, so nobody is told
   "no match" twice (e.g. when the last run fires more than once due to cron jitter or
@@ -254,8 +260,8 @@ aggregate):
 
 ## groups-YYYY-MM-DD.json (output of pair.py, transient)
 
-Produced each run and consumed immediately (the match notifications); only the
-resulting `rounds` entry is persisted.
+Produced each run and consumed immediately (the calendar invites + the messenger
+NOTIFY); only the resulting `rounds` entry is persisted.
 
 ```json
 {
@@ -278,10 +284,10 @@ resulting `rounds` entry is persisted.
 ```
 
 - **slot_utc** — the earliest `default_lunch_duration_min` block inside every
-  member's overlapping UTC free time. The orchestrator converts this UTC slot into
-  each member's own zone to tell them when their lunch is (and, when
-  `config.lunch_reminder` is on, to schedule the at-slot nudge). There is no
-  calendar event — the match message *is* the invite.
+  member's overlapping UTC free time. The orchestrator **creates the calendar event**
+  at this UTC time (Google shows each attendee their own local time) **and** converts
+  it into each member's own zone for the Slack message (and, when
+  `config.lunch_reminder` is on, the at-slot nudge).
 - **repeat_penalty** — 0 is a fresh pairing; higher means the matcher had to reuse
   a recent pairing because nothing better fit. Informational.
 - **unmatched** — people who couldn't be placed, each with a reason. Handle kindly
@@ -327,13 +333,14 @@ writes; the messenger only reads the channel and posts in it.
   the orchestrator records them as availability `pending` (held out of matching this
   run). `flagged` is surfaced to the organizer and never acted on.
 
-**NOTIFY** (after pairing) — the orchestrator hands the messenger, per person:
-their match (partner names), the lunch time **already formatted in that person's
-local zone**, optionally the `ts` of their message to thread under, optionally the
-`config.meeting_link` to include, and whether to schedule an at-slot reminder
-(`config.lunch_reminder`, with the slot time in that person's zone); plus any
-unmatched people to send a kind heads-up. The messenger posts in-channel (and
-schedules the reminder when asked) and returns a delivery report:
+**NOTIFY** (after the orchestrator has created the calendar invites + paired) — the
+orchestrator hands the messenger, per person: their match (partner names), the lunch
+time **already formatted in that person's local zone**, optionally the `ts` of their
+message to thread under, optionally the `config.meeting_link` to include (secondary —
+the calendar invite already carries the Meet), and whether to schedule an at-slot
+reminder (`config.lunch_reminder`, with the slot time in that person's zone); plus any
+unmatched people to send a kind heads-up. The messenger posts in-channel (announcing
+the invite, and scheduling the reminder when asked) and returns a delivery report:
 
 ```json
 { "posted": [ { "slack_id": "U…", "ok": true, "link": "https://…", "reminder_scheduled": true } ],
